@@ -33,3 +33,68 @@ test('a canceled ride stops updating', async () => {
     await jest.advanceTimersByTimeAsync(120000);
     expect(onUpdate).not.toHaveBeenCalled();
 });
+
+test('a finished ride appears in trips, and a card ride is unpaid until checkout confirms it', async () => {
+    const service = createStubService();
+    const pickup = await service.currentPickup();
+    const [dropoff] = await service.searchPlaces('Central');
+    const [quote] = await service.quotes(pickup, dropoff);
+
+    const ride = await service.requestRide({ pickup, dropoff, quote, payment: 'card' }, () => {});
+    await jest.advanceTimersByTimeAsync(120000);
+    expect((await service.trip(ride.id))?.paid).toBe(false);
+
+    expect(await service.confirmPayment(ride.id, 'failed')).toBe('failed');
+    expect((await service.trip(ride.id))?.paid).toBe(false);
+
+    expect(await service.confirmPayment(ride.id, 'paid')).toBe('paid');
+    expect((await service.trips())[0]).toMatchObject({ id: ride.id, status: 'completed', paid: true });
+});
+
+test('a canceled ride appears in trips with no fare', async () => {
+    const service = createStubService();
+    const pickup = await service.currentPickup();
+    const [dropoff] = await service.searchPlaces('Central');
+    const [quote] = await service.quotes(pickup, dropoff);
+
+    const ride = await service.requestRide({ pickup, dropoff, quote, payment: 'cash' }, () => {});
+    await service.cancelRide(ride.id);
+    expect(await service.trip(ride.id)).toMatchObject({ status: 'canceled', fare: undefined, paid: false });
+});
+
+test('saved places can be added, edited and deleted', async () => {
+    const service = createStubService();
+    const place = await service.savePlace({ name: 'Gym', address: '7 Mill Lane' });
+    expect(await service.searchPlaces('gym')).toEqual([place]);
+
+    await service.savePlace({ id: place.id, name: 'Pool', address: '7 Mill Lane' });
+    expect((await service.savedPlaces()).map((item) => item.name)).toContain('Pool');
+
+    await service.deletePlace(place.id);
+    expect((await service.savedPlaces()).map((item) => item.id)).not.toContain(place.id);
+});
+
+test('watchers see sent messages and the driver reply until they stop watching', async () => {
+    const service = createStubService();
+    const onChange = jest.fn();
+    const stop = service.watchMessages('ride', onChange);
+    expect(onChange).toHaveBeenLastCalledWith([]);
+
+    await service.sendMessage('ride', 'On my way');
+    expect(onChange.mock.lastCall?.[0].map((message: { from: string }) => message.from)).toEqual(['rider']);
+
+    await jest.advanceTimersByTimeAsync(2000);
+    expect(onChange.mock.lastCall?.[0].map((message: { from: string }) => message.from)).toEqual(['rider', 'driver']);
+
+    stop();
+    const calls = onChange.mock.calls.length;
+    await service.sendMessage('ride', 'Again');
+    expect(onChange.mock.calls.length).toBe(calls);
+});
+
+test('deleting an account clears saved places and trips', async () => {
+    const service = createStubService();
+    await service.deleteAccount();
+    expect(await service.savedPlaces()).toEqual([]);
+    expect(await service.trips()).toEqual([]);
+});

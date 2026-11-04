@@ -79,3 +79,15 @@ yarn-error.log
 !.yarn/patches
 !.yarn/releases
 .pnp.*
+
+# Web build
+/dist
+
+# Written by scripts/link-brand.js from brand/ (or the root templates)
+/src/generated/
+
+# A client build's own files
+/brand/
+
+# Local settings
+/.env

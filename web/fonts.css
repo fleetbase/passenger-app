@@ -1,0 +1,8 @@
+/* `Figtree` serves Tamagui's weights. The named families match the native font names that some styles use directly. */
+@font-face { font-family: 'Figtree'; font-weight: 400; src: url('../assets/fonts/Figtree-Regular.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree'; font-weight: 500; src: url('../assets/fonts/Figtree-Medium.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree'; font-weight: 600; src: url('../assets/fonts/Figtree-SemiBold.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree'; font-weight: 700; src: url('../assets/fonts/Figtree-Bold.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree'; font-weight: 800; src: url('../assets/fonts/Figtree-ExtraBold.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree-Medium'; src: url('../assets/fonts/Figtree-Medium.ttf'); font-display: swap; }
+@font-face { font-family: 'Figtree-SemiBold'; src: url('../assets/fonts/Figtree-SemiBold.ttf'); font-display: swap; }

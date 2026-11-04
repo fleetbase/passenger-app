@@ -1,15 +1,33 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, TextInput } from 'react-native';
+import { Linking, Pressable, ScrollView, TextInput } from 'react-native';
 import { useTheme, XStack, YStack } from 'tamagui';
+import { branding as brand, fontFace } from '../branding';
+import { componentSlot } from '../extensions/components/component-slot';
+import type { ComponentPropsMap } from '../extensions/components/types';
 import type { RootStack } from '../navigation';
+import type { Checkout, PaymentResult } from '../services/types';
 import { useApp } from '../state/AppContext';
-import { Avatar, Banner, BottomStack, Button, Card, Icon, Plate, Screen, T, TopStack } from '../ui';
+import { Avatar, Banner, BottomStack, Button, Card, Icon, Lines, Plate, Row, Screen, T, TopStack } from '../ui';
+import { HostedCheckout } from '../ui/HostedCheckout';
 import { RideMap } from '../ui/RideMap';
+import { share } from '../utils/share';
 
-/** R13, R14, R16, R17 and R18. One screen, because the map stays put as the status changes. */
+const DriverCard = componentSlot('ride.driverCard', ({ driver, compact }: ComponentPropsMap['ride.driverCard']) => (
+    <XStack alignItems='center' gap={12}>
+        <Avatar initials={driver.initials} size={compact ? 52 : 60} />
+        <YStack flex={1}>
+            <T variant='action'>{driver.name}</T>
+            <T variant='secondary' tone='$sub'>★ {driver.rating} · {compact ? driver.plate : driver.vehicle}</T>
+        </YStack>
+    </XStack>
+));
+
+/** R13, R14, R16, R17, R18 and R18s. One screen, because the map stays put as the status changes. */
 export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ride'>) {
-    const { ride, cancelRide } = useApp();
+    const { service, ride, cancelRide } = useApp();
+    const [safety, setSafety] = useState(false);
+    const [shareNote, setShareNote] = useState<{ text: string; tone: 'ok' | 'danger' }>();
 
     useEffect(() => {
         if (ride?.status === 'completed') {
@@ -24,6 +42,16 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
     const cancel = async () => {
         await cancelRide();
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    };
+
+    const shareTrip = async () => {
+        try {
+            const link = await service.shareLink(ride.id);
+            const outcome = await share(`Follow my ${brand.name} trip to ${ride.dropoff.name}: ${link}`);
+            setShareNote(outcome === 'copied' ? { text: 'Trip link copied. Paste it to someone you trust.', tone: 'ok' } : undefined);
+        } catch {
+            setShareNote({ text: "We couldn't share your trip. Try again.", tone: 'danger' });
+        }
     };
 
     const { status, driver } = ride;
@@ -68,6 +96,19 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
             ) : null}
 
             <BottomStack>
+                {shareNote ? <Banner text={shareNote.text} tone={shareNote.tone} /> : null}
+                {safety ? (
+                    <Card>
+                        <T variant='title'>Your safety</T>
+                        <T tone='$sub'>Your trip is being tracked. If you're in danger, call emergency services.</T>
+                        <YStack>
+                            <Row title='Call emergency services' subtitle={brand.emergencyNumber} icon='phone' onPress={() => Linking.openURL(`tel:${brand.emergencyNumber}`)} />
+                            <Row title='Share trip' subtitle='Send a live link to someone you trust' icon='share' onPress={shareTrip} last={!brand.support?.phone} />
+                            {brand.support?.phone ? <Row title={`Contact ${brand.name}`} subtitle='Get help with this trip' icon='help' onPress={() => Linking.openURL(`tel:${brand.support?.phone}`)} last /> : null}
+                        </YStack>
+                        <Button label='Close' kind='second' onPress={() => setSafety(false)} />
+                    </Card>
+                ) : (
                 <Card>
                     {status === 'searching' ? (
                         <>
@@ -87,17 +128,11 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
 
                     {hasDriver && driver ? (
                         <>
-                            <XStack alignItems='center' gap={12}>
-                                <Avatar initials={driver.initials} size={onTrip ? 52 : 60} />
-                                <YStack flex={1}>
-                                    <T variant='action'>{driver.name}</T>
-                                    <T variant='secondary' tone='$sub'>★ {driver.rating} · {onTrip ? driver.plate : driver.vehicle}</T>
-                                </YStack>
-                            </XStack>
+                            <DriverCard driver={driver} compact={onTrip} />
                             {onTrip ? (
                                 <XStack gap={8}>
-                                    <Button label='Share trip' kind='second' flex={1} />
-                                    <Button label='Safety' kind='second' flex={1} />
+                                    <Button label='Share trip' kind='second' flex={1} onPress={shareTrip} />
+                                    <Button label='Safety' kind='second' flex={1} onPress={() => setSafety(true)} />
                                 </XStack>
                             ) : (
                                 <>
@@ -108,22 +143,24 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
                                     />
                                     <XStack gap={8}>
                                         <Button label='Cancel' kind='second' flex={1} onPress={cancel} />
-                                        <Button label={`Message ${driver.name.split(' ')[0]}`} flex={2} />
+                                        <Button label={`Message ${driver.name.split(' ')[0]}`} flex={2} onPress={() => navigation.navigate('Chat')} />
                                     </XStack>
                                 </>
                             )}
                         </>
                     ) : null}
                 </Card>
+                )}
             </BottomStack>
         </YStack>
     );
 }
 
-/** R23, R24 and R24's hosted checkout. The checkout page itself comes from the payment provider. */
+/** R23, R24, R24c and R26. The checkout page itself comes from the payment provider. */
 export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay'>) {
-    const { ride } = useApp();
+    const { service, ride } = useApp();
     const [stage, setStage] = useState<'fare' | 'checkout' | 'failed' | 'paid'>('fare');
+    const [checkout, setCheckout] = useState<Checkout>();
 
     if (!ride?.fare) {
         return null;
@@ -132,15 +169,32 @@ export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay
     const cash = ride.payment === 'cash';
     const rate = () => navigation.reset({ index: 0, routes: [{ name: 'Rate' }] });
 
+    const startCheckout = async () => {
+        setCheckout(undefined);
+        setStage('checkout');
+        try {
+            setCheckout(await service.createCheckout(ride.id));
+        } catch {
+            setStage('failed');
+        }
+    };
+
+    const finishCheckout = async (reported: PaymentResult) => {
+        try {
+            setStage(await service.confirmPayment(ride.id, reported));
+        } catch {
+            setStage('failed');
+        }
+    };
+
     if (stage === 'checkout') {
         return (
             <Screen>
-                <T variant='caption' tone='$sub'>Secure checkout, opened in a web view</T>
+                <T variant='caption' tone='$sub'>Secure checkout</T>
                 <T variant='title'>Pay {ride.fare.total}</T>
-                <YStack flex={1} borderRadius={20} borderWidth={2} borderStyle='dashed' borderColor='$line' alignItems='center' justifyContent='center' padding={24}>
-                    <T tone='$sub' textAlign='center'>Hosted payment page goes here. Its design comes from the payment provider, not this app.</T>
+                <YStack flex={1} borderRadius={20} overflow='hidden' borderWidth={1} borderColor='$line'>
+                    {checkout ? <HostedCheckout checkout={checkout} onResult={finishCheckout} /> : null}
                 </YStack>
-                <Button label={`Pay ${ride.fare.total}`} onPress={() => setStage('paid')} />
                 <Button label='Close without paying' kind='ghost' onPress={() => setStage('failed')} />
             </Screen>
         );
@@ -151,22 +205,17 @@ export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay
             <ScrollView contentContainerStyle={{ gap: 14 }}>
                 <T variant='title'>{stage === 'paid' ? 'Thanks for riding' : cash ? `Pay ${driverName} in cash` : 'Trip complete'}</T>
                 <T variant='glance' style={{ fontVariant: ['tabular-nums'] }}>{ride.fare.total}</T>
-                <YStack borderRadius={20} backgroundColor='$raised' padding={16} gap={10}>
-                    {ride.fare.lines.map((line) => (
-                        <XStack key={line.label} justifyContent='space-between'>
-                            <T>{line.label}</T>
-                            <T style={{ fontVariant: ['tabular-nums'] }}>{line.amount}</T>
-                        </XStack>
-                    ))}
-                </YStack>
+                <Lines lines={ride.fare.lines} />
                 <T variant='secondary' tone='$sub'>Your estimate was {ride.fare.estimate}. The final fare uses the trip's actual distance and time.</T>
                 {stage === 'failed' ? <Banner tone='danger' text="Your payment didn't go through. You'll need to settle this before your next ride." /> : null}
                 {stage === 'paid' ? <Banner tone='ok' text='Payment received. Your receipt is ready.' /> : null}
             </ScrollView>
+            {stage === 'paid' ? <Button label='View receipt' kind='second' onPress={() => navigation.navigate('Receipt', { tripId: ride.id })} /> : null}
+            {stage === 'failed' ? <Button label={`Contact ${brand.name}`} kind='second' onPress={() => navigation.navigate('Help')} /> : null}
             {cash || stage === 'paid' ? (
                 <Button label={cash ? "I've paid, rate my ride" : 'Rate my ride'} onPress={rate} />
             ) : (
-                <Button label={stage === 'failed' ? 'Try again' : 'Continue to payment'} onPress={() => setStage('checkout')} />
+                <Button label={stage === 'failed' ? 'Try again' : 'Continue to payment'} onPress={startCheckout} />
             )}
         </Screen>
     );
@@ -206,7 +255,7 @@ export function RateScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ra
                 onChangeText={setComment}
                 placeholder='Add a comment (optional)'
                 placeholderTextColor={theme.sub.val}
-                style={{ alignSelf: 'stretch', height: 60, borderRadius: 18, backgroundColor: theme.raised.val, color: theme.text.val, paddingHorizontal: 16, fontFamily: 'Figtree-Medium', fontSize: 16 }}
+                style={{ alignSelf: 'stretch', height: 60, borderRadius: 18, backgroundColor: theme.raised.val, color: theme.text.val, paddingHorizontal: 16, fontFamily: fontFace('500'), fontSize: 16 }}
             />
             <YStack flex={1} />
             <YStack alignSelf='stretch' gap={6}>

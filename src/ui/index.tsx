@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, TextInput, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { fontFace, branding } from '../branding';
 import { Text, useTheme, XStack, YStack, type TextProps, type YStackProps } from 'tamagui';
 
 export const icons = {
@@ -17,6 +18,14 @@ export const icons = {
     van: 'M5 17H2V7a1 1 0 0 1 1-1h12l5 5 2 1v5h-3 M9 17h6 M2 11h18 M14 6v5 M5 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M15 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
     search: 'M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0z M21 21l-4.5-4.5',
     star: 'M12 3l2.8 5.8 6.2.9-4.5 4.4 1.1 6.3L12 17.5l-5.6 2.9 1.1-6.3L3 9.7l6.2-.9z',
+    phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z',
+    mail: 'M3 6h18v12H3z M3 7l9 7 9-7',
+    doc: 'M6 3h9l4 4v14H6z M9 12h7 M9 16h7',
+    moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+    trash: 'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13',
+    help: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.7 M12 17h.01',
+    share: 'M12 15V4 M8 8l4-4 4 4 M5 13v7h14v-7',
+    send: 'M12 19V5 M6 11l6-6 6 6',
 };
 
 export function Icon({ name, size = 22, color, fill = 'none' }: { name: keyof typeof icons; size?: number; color: string; fill?: string }) {
@@ -88,7 +97,7 @@ export function RoundButton({ icon, label, onPress }: { icon: keyof typeof icons
 export const floating = { shadowColor: '#111827', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6 };
 
 export function Card(props: YStackProps) {
-    return <YStack backgroundColor='$surface' borderRadius={28} padding={20} gap={14} {...floating} {...props} />;
+    return <YStack backgroundColor='$surface' borderRadius={branding.radius} padding={20} gap={14} {...floating} {...props} />;
 }
 
 /** Holds floating cards against the bottom of a map screen, above the home indicator. */
@@ -115,30 +124,62 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
             <TextInput
                 accessibilityLabel={label}
                 placeholderTextColor={theme.sub.val}
-                style={{ height: 56, borderRadius: 18, backgroundColor: theme.raised.val, color: theme.text.val, paddingHorizontal: 16, fontFamily: 'Figtree-SemiBold', fontSize: 17 }}
+                style={{ height: 56, borderRadius: 18, backgroundColor: theme.raised.val, color: theme.text.val, paddingHorizontal: 16, fontFamily: fontFace('600'), fontSize: 17 }}
                 {...props}
             />
         </YStack>
     );
 }
 
-export function Row({ title, subtitle, icon, trailing, onPress, last }: { title: string; subtitle?: string; icon?: keyof typeof icons; trailing?: string; onPress?: () => void; last?: boolean }) {
+export function Row({ title, subtitle, icon, trailing, onPress, last, danger }: { title: string; subtitle?: string; icon?: keyof typeof icons; trailing?: string; onPress?: () => void; last?: boolean; danger?: boolean }) {
     const theme = useTheme();
     return (
         <Pressable accessibilityRole={onPress ? 'button' : undefined} onPress={onPress}>
             <XStack minHeight={60} alignItems='center' gap={12} paddingVertical={6} borderBottomWidth={last ? 0 : 1} borderBottomColor='$line'>
                 {icon ? (
-                    <YStack width={40} height={40} borderRadius={20} backgroundColor='$tint' alignItems='center' justifyContent='center'>
-                        <Icon name={icon} size={20} color={theme.ink.val} />
+                    <YStack width={40} height={40} borderRadius={20} backgroundColor={danger ? '$dangerBg' : '$tint'} alignItems='center' justifyContent='center'>
+                        <Icon name={icon} size={20} color={danger ? theme.danger.val : theme.ink.val} />
                     </YStack>
                 ) : null}
                 <YStack flex={1}>
-                    <T variant='strong'>{title}</T>
+                    <T variant='strong' tone={danger ? '$danger' : '$text'}>{title}</T>
                     {subtitle ? <T variant='secondary' tone='$sub'>{subtitle}</T> : null}
                 </YStack>
                 {trailing ? <T variant='secondary' tone='$sub'>{trailing}</T> : null}
             </XStack>
         </Pressable>
+    );
+}
+
+/** Back button and title for the screens with no map. */
+export function Header({ title, onBack }: { title: string; onBack: () => void }) {
+    return (
+        <>
+            <XStack>
+                <RoundButton icon='back' label='Back' onPress={onBack} />
+            </XStack>
+            <T variant='title'>{title}</T>
+        </>
+    );
+}
+
+/** Label and amount rows, as fares and receipts show them. `total` makes a final row stand out. */
+export function Lines({ lines, total }: { lines: { label: string; amount: string }[]; total?: { label: string; amount: string } }) {
+    return (
+        <YStack borderRadius={20} backgroundColor='$raised' padding={16} gap={10}>
+            {lines.map((line) => (
+                <XStack key={line.label} justifyContent='space-between' gap={12}>
+                    <T flexShrink={1}>{line.label}</T>
+                    <T style={{ fontVariant: ['tabular-nums'] }}>{line.amount}</T>
+                </XStack>
+            ))}
+            {total ? (
+                <XStack justifyContent='space-between' gap={12} borderTopWidth={lines.length ? 1 : 0} borderTopColor='$line' paddingTop={lines.length ? 10 : 0}>
+                    <T variant='strong' fontWeight='700'>{total.label}</T>
+                    <T variant='strong' fontWeight='700' style={{ fontVariant: ['tabular-nums'] }}>{total.amount}</T>
+                </XStack>
+            ) : null}
+        </YStack>
     );
 }
 

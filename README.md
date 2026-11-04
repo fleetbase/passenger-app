@@ -4,14 +4,9 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 
 ## Status
 
-Early development. The main journey runs on sample data through a stub service (`src/services/stub.ts`), including a simulated driver. It doesn't connect to a Fleetbase backend yet, because the Fleet-Ops rider API isn't built. Don't use this for real rides.
+**Early development, and mostly not connected to Fleetbase yet.** By default the app talks to Fleet-Ops, but only phone sign-in is connected. Everything after it shows an error until it's connected. The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
 
-Working on the stub:
-
-- Phone sign-in
-- Home, destination search and choosing a car class
-- Finding a driver, driver on the way, driver arrived and in trip
-- Final fare, cash or card payment, and rating
+To try the full journey without a server, set `PASSENGER_SAMPLE_DATA=true` in `.env`. It uses a simulated driver, and a banner stays on screen. On sample data, trips and saved places reset when the app restarts, and the card checkout, trip link and driver replies aren't real. No card is charged.
 
 ## Getting started
 
@@ -20,6 +15,7 @@ You need Node 20, Yarn (through Corepack), Xcode with CocoaPods, and Android Stu
 ```bash
 corepack enable
 yarn install
+cp .env.example .env
 cd ios && pod install && cd ..
 yarn start
 ```
@@ -40,15 +36,26 @@ GOOGLE_MAPS_API_KEY=your-key
 yarn android
 ```
 
-Enter any phone number and any code of at least four digits to sign in on the stub.
+For the web build:
 
-## Branding
+```bash
+yarn web
+```
 
-Edit `passenger.brand.ts` to set the operator's name and colours. Presets are `default`, `yellow` and `dark`, and `colors` overrides individual tokens for the light and dark themes. Restart Metro with `yarn start --reset-cache` after changing it.
+This serves the app at http://localhost:8092 and proxies API requests to `PASSENGER_HOST`. A deployed site calls the API directly, so its address must be in the API's `FRONTEND_HOSTS`, or browsers will block every request. `yarn web:build` writes a production build to `dist/`. The web build uses Leaflet in place of the native map, with OpenStreetMap tiles by default. OpenStreetMap's tile servers aren't meant for heavy production use, so set `webMapTiles` in `passenger.brand.ts` before going live.
+
+Set `PASSENGER_HOST` and `PASSENGER_KEY` in `.env`, then restart Metro with `yarn start --reset-cache`. On sample data, any phone number and any code of at least four digits signs you in.
+
+## Branding and custom screens
+
+Don't edit the templates at the repository root. A client build keeps its files in `brand/`, which this repository ignores, so upgrades never conflict:
+
+- `brand/passenger.brand.ts`: name, colours, fonts, appearance, contacts and emergency number. See [docs/branding.md](docs/branding.md).
+- `brand/passenger.extensions.ts`: replaces screens and components, and adds routes. See [docs/extending.md](docs/extending.md).
 
 ## Connecting a backend
 
-Screens only talk to the `RideService` interface in `src/services/types.ts`. A Fleetbase implementation will replace `createStubService()` in `src/state/AppContext.tsx`.
+Screens only talk to the `RideService` interface in `src/services/types.ts`. `src/services/fleetbase.ts` implements it on Fleet-Ops, and `src/services/stub.ts` is the sample data.
 
 ## License
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { YStack } from 'tamagui';
-import brand from '../../passenger.brand';
+import { BrandLogo } from '../branding/BrandLogo';
+import { NotConfiguredError } from '../services/fleetbase';
 import { useApp } from '../state/AppContext';
 import { Banner, Button, Field, Screen, T } from '../ui';
 
@@ -20,8 +21,8 @@ export function SignInScreen() {
         try {
             await service.requestCode(phone);
             setCodeSent(true);
-        } catch {
-            setError("We couldn't send a code. Check the number and try again.");
+        } catch (cause) {
+            setError(cause instanceof NotConfiguredError ? cause.message : "We couldn't send a code. Check the number and try again.");
         } finally {
             setBusy(false);
         }
@@ -31,8 +32,7 @@ export function SignInScreen() {
         setBusy(true);
         setError(undefined);
         try {
-            const { firstName } = await service.verifyCode(phone, code);
-            signIn(firstName);
+            signIn(await service.verifyCode(phone, code));
         } catch {
             setError("That code isn't right. Check it and try again.");
         } finally {
@@ -43,7 +43,7 @@ export function SignInScreen() {
     return (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Screen>
-                <T variant='action' fontWeight='800' tone='$ink'>{brand.name}</T>
+                <BrandLogo />
                 {codeSent ? (
                     <>
                         <T variant='display'>Enter your code</T>

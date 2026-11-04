@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title><%= htmlWebpackPlugin.options.title %></title>
+        <style>
+            html, body { height: 100%; margin: 0; background: #d9dee4; }
+            /* The app stays phone-sized on a wide screen, since it's designed for one hand. */
+            #root { position: relative; display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; overflow: hidden; background: #fff; }
+            /* React Native Web renders pressable rows as buttons, which centre text by default. */
+            button { text-align: inherit; }
+            @media (prefers-color-scheme: dark) { html, body { background: #0b1017; } #root { background: #141922; } }
+        </style>
+    </head>
+    <body>
+        <!-- Tamagui reads other process.env values that only exist in its own tests. -->
+        <script>window.process = { env: {} };</script>
+        <div id="root"></div>
+    </body>
+</html>
