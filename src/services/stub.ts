@@ -210,9 +210,7 @@ export function createStubService(): RideService {
         },
         onSessionExpired() {},
         async signOut() {},
-        async requestCode() {
-            return { newRider: false };
-        },
+        async requestCode() {},
         async verifyCode(phone) {
             return { firstName: 'Sam', lastName: 'Reed', phone } satisfies Profile;
         },

@@ -4,7 +4,7 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 
 ## Status
 
-**Early development: rider data is connected to Fleet-Ops, but booking a ride isn't.** Sign-in, signup, profile, saved places (read only), place search, fares and trip history use the real API. Requesting a ride, adding or deleting places, deleting an account, chat, ratings and payment show "This isn't available yet". The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
+**Early development: rider data is connected to Fleet-Ops, but booking a ride isn't.** Sign-in, signup, profile, saved places, place search, fares and trip history use the real API. Requesting a ride, deleting an account, chat, ratings and payment show "This isn't available yet". The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
 
 To try the full journey without a server, set `PASSENGER_SAMPLE_DATA=true` in `.env`. It uses a simulated driver, and a banner stays on screen. On sample data, trips and saved places reset when the app restarts, and the card checkout, trip link and driver replies aren't real. No card is charged.
 
@@ -44,7 +44,7 @@ yarn web
 
 This serves the app at http://localhost:8092 and proxies API requests to `PASSENGER_HOST`. A deployed site calls the API directly, so its address must be in the API's `FRONTEND_HOSTS`, or browsers will block every request. `yarn web:build` writes a production build to `dist/`. The web build uses Leaflet in place of the native map, with OpenStreetMap tiles by default. OpenStreetMap's tile servers aren't meant for heavy production use, so set `webMapTiles` in `passenger.brand.ts` before going live.
 
-Set `PASSENGER_HOST` and `PASSENGER_KEY` in `.env`, then restart Metro with `yarn start --reset-cache`. On sample data, any phone number and any code of at least four digits signs you in.
+Set `PASSENGER_HOST` and `PASSENGER_KEY` in `.env`, using an API key with the `rider` profile, then restart Metro with `yarn start --reset-cache`. On sample data, any phone number and any code of at least four digits signs you in.
 
 ## Branding and custom screens
 

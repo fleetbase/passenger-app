@@ -112,9 +112,9 @@ export interface RideService {
     /** Runs when the server rejects the rider's sign-in, for example after it was revoked. */
     onSessionExpired(listener: () => void): void;
     signOut(): Promise<void>;
-    /** `newRider` means the number has no account, so `verifyCode` needs a name to create one. */
-    requestCode(phone: string): Promise<{ newRider: boolean }>;
-    verifyCode(phone: string, code: string, name?: string): Promise<Profile>;
+    requestCode(phone: string): Promise<void>;
+    /** `needs-name` means the code is right but the number has no account. Call again with a name to create one. */
+    verifyCode(phone: string, code: string, name?: string): Promise<Profile | 'needs-name'>;
     updateProfile(profile: Profile): Promise<Profile>;
     deleteAccount(): Promise<void>;
     currentPickup(): Promise<Place>;

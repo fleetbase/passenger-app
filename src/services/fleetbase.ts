@@ -1,4 +1,3 @@
-import 'react-native-get-random-values';
 import Fleetbase from '@fleetbase/sdk';
 import { Platform } from 'react-native';
 import { NotConfiguredError, NotConnectedError } from './errors';
@@ -46,14 +45,17 @@ const savedKind = (name: string): Place['saved'] => {
     return lower === 'home' || lower === 'work' ? lower : 'custom';
 };
 
+/** The API stores new places in capitals, which reads as shouting on a phone. */
+const readable = (text?: string | null) => (text && text === text.toUpperCase() ? text.toLowerCase().replace(/(^|[\s,-])(\p{L})/gu, (_, gap, letter) => gap + letter.toUpperCase()) : text);
+
 const toPlace = (resource?: PlaceResource | null): Place | undefined => {
     const coordinates = resource?.location?.coordinates;
     if (!resource || !coordinates) {
         return undefined;
     }
     const [longitude, latitude] = coordinates;
-    const name = resource.name || resource.street1 || resource.address || '';
-    const detail = [resource.street1, resource.city].filter((part) => part && part !== name).join(', ');
+    const name = readable(resource.name || resource.street1 || resource.address) ?? '';
+    const detail = [readable(resource.street1), readable(resource.city)].filter((part) => part && part !== name).join(', ');
     // Addresses found by the geocoder aren't stored, so they have no id.
     return { id: resource.id || `geo:${latitude},${longitude}`, name, detail, location: { latitude, longitude } };
 };
@@ -95,11 +97,6 @@ const toTrip = (order: OrderResource): Trip | undefined => {
 /** A stored place by id. Anything else by where it is, because the API can't look it up. */
 const placeParam = ({ id, location }: Place): string | Coordinate => (id.startsWith('place_') ? id : location);
 
-const randomPassword = () => {
-    const bytes = (globalThis as unknown as { crypto: { getRandomValues: (array: Uint8Array) => Uint8Array } }).crypto.getRandomValues(new Uint8Array(32));
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-
 const reachableHost = (host: string) => {
     // An Android emulator reaches the machine it runs on through this address.
     if (Platform.OS === 'android') {
@@ -110,7 +107,7 @@ const reachableHost = (host: string) => {
 };
 
 /**
- * `RideService` on the Fleet-Ops API. Rider data is connected; the rest is added milestone by
+ * `RideService` on the Fleet-Ops API, using a key with the rider profile. Rider data is connected; the rest is added milestone by
  * milestone (see ride-hailing/FLEETOPS-INTEGRATION-PLAN.md) and fails clearly until then.
  */
 export function createFleetbaseService({ host, key }: { host: string; key: string }): RideService {
@@ -170,7 +167,12 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
 
     const currentPickup = () => {
         if (!pickup || Date.now() - pickup.at > PICKUP_LIFETIME_MS) {
-            const place = currentPosition().then((location): Place => ({ id: CURRENT_LOCATION, name: 'Current location', detail: '', location }));
+            const place = currentPosition().then(async (location): Promise<Place> => {
+                const found = await asRider<PlaceResource[]>((api, options) => api.get('customers/geocode', location, options)).catch(() => []);
+                const address = toPlace(found[0]);
+                // A pickup without a street name is still a pickup, so a failed lookup doesn't stop it.
+                return { id: CURRENT_LOCATION, name: address?.name || 'Current location', detail: address?.detail ?? '', location };
+            });
             const entry = { at: Date.now(), place };
             pickup = entry;
             place.catch(() => {
@@ -212,25 +214,12 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             }
         },
         async requestCode(phone) {
-            try {
-                await adapter().post('customers/login-with-sms', { phone });
-                return { newRider: false };
-            } catch (cause) {
-                // This route is the only way to tell a new rider apart today, and M3 has to stop it
-                // revealing who has an account. Signup has to change with it.
-                if ((cause as Error).message !== 'No customer with this phone number found.') {
-                    throw cause;
-                }
-                await adapter().post('customers/request-creation-code', { mode: 'sms', identity: phone });
-                return { newRider: true };
-            }
+            await adapter().post('customers/request-code', { phone });
         },
         async verifyCode(phone, code, name) {
-            // Riders sign in by phone, but signup requires a password. Nobody ever sees this one.
-            const customer = name
-                ? await adapter().post('customers', { identity: phone, code, name, password: randomPassword() })
-                : await adapter().post('customers/verify-code', { identity: phone, code });
-            return startSession(customer as CustomerResource, phone);
+            const customer = (name ? await adapter().post('customers', { identity: phone, code, name }) : await adapter().post('customers/verify-code', { identity: phone, code })) as CustomerResource & { status?: string };
+            // Only a proven code reveals that the number has no account yet.
+            return customer.status === 'new_customer' ? 'needs-name' : startSession(customer, phone);
         },
         async updateProfile(profile) {
             // The phone number stays out: this route changes it without verifying the new one.
@@ -246,14 +235,25 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
         deleteAccount: notConnected('deleteAccount'),
         currentPickup,
         savedPlaces,
-        savePlace: notConnected('savePlace'),
-        deletePlace: notConnected('deletePlace'),
+        async savePlace({ id, name, address }) {
+            const found = await asRider<PlaceResource[]>((api, options) => api.get('customers/geocode', { query: address }, options));
+            const location = toPlace(found[0])?.location;
+            if (!location) {
+                throw new Error("We couldn't find that address. Try adding the city.");
+            }
+            const body = { name, street1: address, ...location };
+            const saved = await asRider<PlaceResource>((api, options) => (id ? api.put(`customers/places/${id}`, body, options) : api.post('customers/places', body, options)));
+            return { ...(toPlace(saved) as Place), saved: savedKind(name) };
+        },
+        async deletePlace(placeId) {
+            await asRider((api, options) => api.delete(`customers/places/${placeId}`, {}, options));
+        },
         async searchPlaces(query) {
             if (!query.trim()) {
                 return savedPlaces();
             }
             const near = await currentPickup().catch(() => undefined);
-            const places = (await adapter().get('places/search', { query, geo: 1, limit: 10, latitude: near?.location.latitude, longitude: near?.location.longitude })) as PlaceResource[];
+            const places = await asRider<PlaceResource[]>((api, options) => api.get('customers/places/search', { query, limit: 10, latitude: near?.location.latitude, longitude: near?.location.longitude }, options));
             // The geocoder also returns addresses that are only nearby, so put real matches first.
             const found = places.flatMap((resource) => toPlace(resource) ?? []);
             const matches = (place: Place) => place.name.toLowerCase().includes(query.trim().toLowerCase());

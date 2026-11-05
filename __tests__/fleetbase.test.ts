@@ -2,7 +2,6 @@ import { NotConnectedError } from '../src/services/errors';
 import { createFleetbaseService } from '../src/services/fleetbase';
 import { clearSession, readSession, saveSession } from '../src/services/session';
 
-jest.mock('react-native-get-random-values', () => ({}));
 jest.mock('../src/services/location', () => ({ currentPosition: jest.fn(async () => ({ latitude: 1.28, longitude: 103.85 })) }));
 jest.mock('../src/services/session', () => ({
     readSession: jest.fn(async () => undefined),
@@ -34,31 +33,27 @@ const place = (name: string, longitude: number, latitude: number, id = 'place_ab
 
 beforeEach(() => jest.clearAllMocks());
 
-test('a known number gets a sign-in code', async () => {
-    const sent = respondWith({ 'POST customers/login-with-sms': () => [200, { status: 'ok' }] });
+test('asking for a code looks the same for any number', async () => {
+    const sent = respondWith({ 'POST customers/request-code': () => [200, { status: 'ok' }] });
     const service = createFleetbaseService({ host: 'http://api.test', key: 'flb_live_test' });
-    await expect(service.requestCode('+15550190301')).resolves.toEqual({ newRider: false });
+    await expect(service.requestCode('+15550190301')).resolves.toBeUndefined();
     expect(sent).toHaveLength(1);
 });
 
-test('an unknown number gets a signup code, and signup never uses a guessable password', async () => {
+test('a new rider is asked for a name after the code, and signup sends no password', async () => {
     const sent = respondWith({
-        'POST customers/login-with-sms': () => [400, { error: 'No customer with this phone number found.' }],
-        'POST customers/request-creation-code': () => [200, { status: 'ok' }],
-        'POST customers': () => [200, { name: 'New Rider', phone: '+15550190303', token: 'new-token' }],
+        'POST customers/verify-code': () => [200, { status: 'new_customer' }],
+        'POST customers': () => [201, { name: 'New Rider', phone: '+15550190303', token: 'new-token' }],
     });
     const service = createFleetbaseService({ host: 'http://api.test', key: 'flb_live_test' });
-    await expect(service.requestCode('+15550190303')).resolves.toEqual({ newRider: true });
-    await expect(service.verifyCode('+15550190303', '123456', 'New Rider')).resolves.toMatchObject({ firstName: 'New', lastName: 'Rider' });
-
-    const signup = sent[sent.length - 1];
-    expect(signup.url).toMatch(/\/v1\/customers$/);
-    expect(signup.body.password).toMatch(/^[0-9a-f]{64}$/);
-    expect(saveSession).toHaveBeenCalledWith(expect.objectContaining({ token: 'new-token' }));
+    await expect(service.verifyCode('+15550190303', '123456')).resolves.toBe('needs-name');
+    await expect(service.verifyCode('+15550190303', '123456', 'New Rider')).resolves.toMatchObject({ firstName: 'New' });
+    const signup = sent.find((request) => request.url.endsWith('/customers'))!;
+    expect(signup.body).toEqual({ identity: '+15550190303', code: '123456', name: 'New Rider' });
 });
 
 test('other send failures are not treated as a new rider', async () => {
-    const sent = respondWith({ 'POST customers/login-with-sms': () => [422, { error: 'This number can not receive messages.' }] });
+    const sent = respondWith({ 'POST customers/request-code': () => [422, { error: 'This number can not receive messages.' }] });
     const service = createFleetbaseService({ host: 'http://api.test', key: 'flb_live_test' });
     await expect(service.requestCode('+15550190301')).rejects.toThrow('can not receive');
     expect(sent).toHaveLength(1);
@@ -143,7 +138,7 @@ test('history shows finished trips only, newest first, without claiming how they
 });
 
 test('a search puts real matches ahead of nearby addresses', async () => {
-    const { service } = await signedIn({ 'GET places/search': () => [200, [place('1 Raffles Place', 103.85, 1.28, 'place_a'), place('Changi Airport', 103.99, 1.36, 'place_b')]] });
+    const { service } = await signedIn({ 'GET customers/places/search': () => [200, [place('1 Raffles Place', 103.85, 1.28, 'place_a'), place('Changi Airport', 103.99, 1.36, 'place_b')]] });
     expect((await service.searchPlaces('airport')).map((item) => item.name)).toEqual(['Changi Airport', '1 Raffles Place']);
 });
 
@@ -155,7 +150,7 @@ test('an empty search shows saved places without querying the company', async ()
 
 test('a place found by the geocoder gets a stable id and quotes by location', async () => {
     const { service, sent } = await signedIn({
-        'GET places/search': () => [200, [{ id: null, name: null, street1: '35 Robinson Road', city: 'Singapore', location: { coordinates: [103.84, 1.27] } }]],
+        'GET customers/places/search': () => [200, [{ id: null, name: null, street1: '35 Robinson Road', city: 'Singapore', location: { coordinates: [103.84, 1.27] } }]],
         'GET service-quotes': () => [200, []],
     });
     const [found] = await service.searchPlaces('robinson');
@@ -167,5 +162,44 @@ test('a place found by the geocoder gets a stable id and quotes by location', as
 test('parts not built yet fail as not connected', async () => {
     const { service } = await signedIn({});
     await expect(service.deleteAccount()).rejects.toBeInstanceOf(NotConnectedError);
-    await expect(service.deletePlace('place_abc')).rejects.toBeInstanceOf(NotConnectedError);
 });
+
+test('saving a place finds the address, then stores it for this rider', async () => {
+    const { service, sent } = await signedIn({
+        'GET customers/geocode': () => [200, [place('1 Raffles Place', 103.85, 1.28, '')]],
+        'POST customers/places': () => [201, place('Gym', 103.85, 1.28, 'place_gym')],
+        'PUT customers/places/place_gym': () => [200, place('Work', 103.85, 1.28, 'place_gym')],
+    });
+    await expect(service.savePlace({ name: 'Gym', address: '1 Raffles Place' })).resolves.toMatchObject({ id: 'place_gym', saved: 'custom' });
+    expect(sent[sent.length - 1].body).toEqual({ name: 'Gym', street1: '1 Raffles Place', latitude: 1.28, longitude: 103.85 });
+    await expect(service.savePlace({ id: 'place_gym', name: 'Work', address: '1 Raffles Place' })).resolves.toMatchObject({ saved: 'work' });
+});
+
+test('an address that cannot be found is not saved', async () => {
+    const { service, sent } = await signedIn({ 'GET customers/geocode': () => [200, []] });
+    await expect(service.savePlace({ name: 'Gym', address: 'nowhere' })).rejects.toThrow("couldn't find that address");
+    expect(sent.some((request) => request.method === 'POST' && request.url.endsWith('customers/places'))).toBe(false);
+});
+
+test('deleting a place sends the rider token', async () => {
+    const { service, sent } = await signedIn({ 'DELETE customers/places/place_abc': () => [200, { status: 'ok' }] });
+    await service.deletePlace('place_abc');
+    expect(sent[sent.length - 1].headers.get('Customer-Token')).toBe('rider-token');
+});
+
+test('pickup uses the street name, and still works when the lookup fails', async () => {
+    const found = await signedIn({ 'GET customers/geocode': () => [200, [place('1 Raffles Place', 103.85, 1.28, '')]] });
+    await expect(found.service.currentPickup()).resolves.toMatchObject({ name: '1 Raffles Place', location: { latitude: 1.28 } });
+    const failed = await signedIn({ 'GET customers/geocode': () => [503, { error: 'down' }] });
+    await expect(failed.service.currentPickup()).resolves.toMatchObject({ name: 'Current location' });
+});
+
+test('places stored in capitals read normally, and mixed case is left alone', async () => {
+    const { service } = await signedIn({
+        'GET customers/places': () => [200, [{ id: 'place_a', name: 'HOME', street1: '1 RAFFLES PLACE', city: 'SINGAPORE', location: { coordinates: [103.85, 1.28] } }, { id: 'place_b', name: 'McDonald House', location: { coordinates: [103.85, 1.28] } }]],
+    });
+    const [home, other] = await service.savedPlaces();
+    expect(home).toMatchObject({ name: 'Home', detail: '1 Raffles Place, Singapore', saved: 'home' });
+    expect(other.name).toBe('McDonald House');
+});
+

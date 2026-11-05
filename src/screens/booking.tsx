@@ -112,6 +112,7 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
 
     useEffect(() => {
         let current = true;
+        setSearched(false);
         // Every search goes to the server, so wait for a pause in typing.
         const timer = setTimeout(() => {
             service
@@ -154,6 +155,7 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
                     />
                 ))}
                 {searchError ? <Banner tone='danger' text={searchError} /> : null}
+                {!searchError && !searched && query.trim() ? <T tone='$sub'>Searching…</T> : null}
                 {!searchError && searched && query.trim() && results.length === 0 ? <T tone='$sub'>No places found. Check the spelling and try again.</T> : null}
             </ScrollView>
         </Screen>
