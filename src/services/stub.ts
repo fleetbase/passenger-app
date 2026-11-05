@@ -173,13 +173,13 @@ export function createStubService(): RideService {
         await wait(SEARCH_MS);
         const start: Coordinate = { latitude: current.ride.pickup.location.latitude - 0.009, longitude: current.ride.pickup.location.longitude + 0.012 };
         const approach = routeBetween(start, current.ride.pickup.location);
-        if (!update({ status: 'driver_en_route', driver: DRIVER, route: approach, carPosition: start, etaMinutes: current.ride.quote.pickupMinutes + 1 })) {
+        if (!update({ status: 'driver_en_route', driver: DRIVER, route: approach, carPosition: start, etaMinutes: (current.ride.quote.pickupMinutes ?? 3) + 1 })) {
             return;
         }
         for (let tick = 1; tick <= APPROACH_TICKS; tick++) {
             await wait(TICK_MS);
             const remaining = 1 - tick / APPROACH_TICKS;
-            const eta = Math.max(1, Math.ceil(remaining * (current.ride.quote.pickupMinutes + 1)));
+            const eta = Math.max(1, Math.ceil(remaining * ((current.ride.quote.pickupMinutes ?? 3) + 1)));
             if (!update({ carPosition: along(approach, tick / APPROACH_TICKS), etaMinutes: eta })) {
                 return;
             }
@@ -205,7 +205,14 @@ export function createStubService(): RideService {
     };
 
     return {
-        async requestCode() {},
+        async restoreSession() {
+            return undefined;
+        },
+        onSessionExpired() {},
+        async signOut() {},
+        async requestCode() {
+            return { newRider: false };
+        },
         async verifyCode(phone) {
             return { firstName: 'Sam', lastName: 'Reed', phone } satisfies Profile;
         },

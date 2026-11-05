@@ -44,8 +44,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [ride, setRide] = useState<Ride>();
 
     useEffect(() => {
-        AsyncStorage.multiGet([PROFILE_KEY, APPEARANCE_KEY])
-            .then(([[, savedProfile], [, savedAppearance]]) => {
+        service.onSessionExpired(() => setProfile(undefined));
+        Promise.all([AsyncStorage.multiGet([PROFILE_KEY, APPEARANCE_KEY]), service.restoreSession(setProfile)])
+            .then(([[[, savedProfile], [, savedAppearance]], restored]) => {
+                if (restored) {
+                    setProfile(restored);
+                }
                 if (savedProfile && sampleMode) {
                     setProfile(JSON.parse(savedProfile));
                 }
@@ -60,8 +64,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const signIn = useCallback((next: Profile) => {
         setProfile(next);
-        // A real session also needs its token kept, which belongs in secure storage (M2).
-        // Until that exists, a Fleet-Ops sign-in lasts until the app closes.
+        // A real session is kept by the service, in the device's secure storage.
         if (sampleMode) {
             AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(next)).catch(() => {});
         }
@@ -76,6 +79,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = useCallback(() => {
         setProfile(undefined);
+        service.signOut().catch(() => {});
         AsyncStorage.removeItem(PROFILE_KEY).catch(() => {});
     }, []);
 

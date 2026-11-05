@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { YStack } from 'tamagui';
 import { BrandLogo } from '../branding/BrandLogo';
-import { NotConfiguredError } from '../services/fleetbase';
+import { failureText } from '../services/errors';
 import { useApp } from '../state/AppContext';
 import { Banner, Button, Field, Screen, T } from '../ui';
 
@@ -12,6 +12,8 @@ export function SignInScreen() {
     const [phone, setPhone] = useState('');
     const [code, setCode] = useState('');
     const [codeSent, setCodeSent] = useState(false);
+    const [newRider, setNewRider] = useState(false);
+    const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
 
@@ -19,10 +21,10 @@ export function SignInScreen() {
         setBusy(true);
         setError(undefined);
         try {
-            await service.requestCode(phone);
+            setNewRider((await service.requestCode(phone)).newRider);
             setCodeSent(true);
         } catch (cause) {
-            setError(cause instanceof NotConfiguredError ? cause.message : "We couldn't send a code. Check the number and try again.");
+            setError(failureText(cause, "We couldn't send a code. Check the number and try again."));
         } finally {
             setBusy(false);
         }
@@ -32,9 +34,10 @@ export function SignInScreen() {
         setBusy(true);
         setError(undefined);
         try {
-            signIn(await service.verifyCode(phone, code));
-        } catch {
-            setError("That code isn't right. Check it and try again.");
+            signIn(await service.verifyCode(phone, code, newRider ? name.trim() : undefined));
+        } catch (cause) {
+            // The API answers 400 for a wrong code. Anything else is the network or the server.
+            setError((cause as { status?: number }).status === 400 ? "That code isn't right. Check it and try again." : failureText(cause, "We couldn't check your code. Try again."));
         } finally {
             setBusy(false);
         }
@@ -49,6 +52,7 @@ export function SignInScreen() {
                         <T variant='display'>Enter your code</T>
                         <T tone='$sub'>Sent to {phone}</T>
                         <Field label='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' placeholder='6 digits' textContentType='oneTimeCode' autoFocus />
+                        {newRider ? <Field label='Your name' value={name} onChangeText={setName} textContentType='name' autoCorrect={false} /> : null}
                     </>
                 ) : (
                     <>
@@ -59,7 +63,7 @@ export function SignInScreen() {
                 )}
                 {error ? <Banner text={error} tone='danger' /> : null}
                 <YStack flex={1} />
-                {codeSent ? <Button label='Verify' onPress={verify} loading={busy} disabled={code.length < 4} /> : <Button label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
+                {codeSent ? <Button label='Verify' onPress={verify} loading={busy} disabled={code.length < 4 || (newRider && !name.trim())} /> : <Button label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
             </Screen>
         </KeyboardAvoidingView>
     );

@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Linking, Platform, ScrollView } from 'react-nativ
 import { YStack } from 'tamagui';
 import { branding as brand } from '../branding';
 import type { RootStack } from '../navigation';
+import { failureText } from '../services/errors';
 import { getBuildExtensions } from '../extensions/build-extensions';
 import { useApp, type Appearance } from '../state/AppContext';
 import { Banner, Button, Field, Header, Row, Screen, T } from '../ui';
@@ -90,8 +91,8 @@ export function DeleteAccountScreen({ navigation }: NativeStackScreenProps<RootS
         setError(undefined);
         try {
             await deleteAccount();
-        } catch {
-            setError("We couldn't delete your account. Try again.");
+        } catch (cause) {
+            setError(failureText(cause, "We couldn't delete your account. Try again."));
             setBusy(false);
         }
     };

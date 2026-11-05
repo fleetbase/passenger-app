@@ -14,8 +14,10 @@ export type PaymentMethod = 'cash' | 'card';
 export type Quote = {
     id: string;
     className: string;
-    seats: number;
-    pickupMinutes: number;
+    /** Not known yet on Fleet-Ops (M4). */
+    seats?: number;
+    /** Not known yet on Fleet-Ops (M4). */
+    pickupMinutes?: number;
     fare: string;
 };
 
@@ -66,8 +68,10 @@ export type Trip = {
     pickup: Place;
     dropoff: Place;
     route: Coordinate[];
-    payment: PaymentMethod;
-    paid: boolean;
+    /** Fleet-Ops doesn't record this for a trip until M6. */
+    payment?: PaymentMethod;
+    /** Fleet-Ops doesn't record this for a trip until M6. */
+    paid?: boolean;
     driver?: Driver;
     fare?: FinalFare;
     /** For example "6.7 km · 15 min". */
@@ -99,13 +103,18 @@ export type Checkout = { uri: string } | { html: string };
 export type PaymentResult = 'paid' | 'failed';
 
 /**
- * Everything the screens need from a backend. `stub.ts` implements it with sample data
- * until the Fleet-Ops rider API exists; the real implementation replaces it without
- * changing any screen.
+ * Everything the screens need from a backend. `fleetbase.ts` is the real implementation;
+ * `stub.ts` is sample data for demos and tests.
  */
 export interface RideService {
-    requestCode(phone: string): Promise<void>;
-    verifyCode(phone: string, code: string): Promise<Profile>;
+    /** The saved rider, if any. `onRefreshed` runs if the server has newer details. */
+    restoreSession(onRefreshed: (profile: Profile) => void): Promise<Profile | undefined>;
+    /** Runs when the server rejects the rider's sign-in, for example after it was revoked. */
+    onSessionExpired(listener: () => void): void;
+    signOut(): Promise<void>;
+    /** `newRider` means the number has no account, so `verifyCode` needs a name to create one. */
+    requestCode(phone: string): Promise<{ newRider: boolean }>;
+    verifyCode(phone: string, code: string, name?: string): Promise<Profile>;
     updateProfile(profile: Profile): Promise<Profile>;
     deleteAccount(): Promise<void>;
     currentPickup(): Promise<Place>;

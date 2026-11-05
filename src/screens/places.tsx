@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { YStack } from 'tamagui';
 import type { RootStack } from '../navigation';
+import { failureText } from '../services/errors';
 import type { Place } from '../services/types';
 import { useApp } from '../state/AppContext';
 import { Banner, Button, Field, Header, Row, Screen, T } from '../ui';
@@ -68,8 +69,8 @@ export function EditPlaceScreen({ navigation, route }: NativeStackScreenProps<Ro
         try {
             await action();
             navigation.goBack();
-        } catch {
-            setError(failure);
+        } catch (cause) {
+            setError(failureText(cause, failure));
             setBusy(false);
         }
     };

@@ -4,7 +4,7 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 
 ## Status
 
-**Early development, and mostly not connected to Fleetbase yet.** By default the app talks to Fleet-Ops, but only phone sign-in is connected. Everything after it shows an error until it's connected. The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
+**Early development: rider data is connected to Fleet-Ops, but booking a ride isn't.** Sign-in, signup, profile, saved places (read only), place search, fares and trip history use the real API. Requesting a ride, adding or deleting places, deleting an account, chat, ratings and payment show "This isn't available yet". The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
 
 To try the full journey without a server, set `PASSENGER_SAMPLE_DATA=true` in `.env`. It uses a simulated driver, and a banner stays on screen. On sample data, trips and saved places reset when the app restarts, and the card checkout, trip link and driver replies aren't real. No card is charged.
 
