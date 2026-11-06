@@ -162,7 +162,7 @@ Screens only talk to the `RideService` interface in `src/services/types.ts`. `fl
 | `yarn test` | Jest. |
 | `yarn web:build` | A production web build. |
 
-CI runs all four on every pull request to `main`, then builds an Android debug APK and an iOS simulator app. A dependency review fails a pull request that adds a dependency with a high-severity advisory.
+CI runs all four on every pull request to `main`, then builds an Android debug APK and an iOS simulator app. Once the repository is public, a dependency review also fails a pull request that adds a dependency with a high-severity advisory.
 
 ## Branches, commits and releases
 
