@@ -1,3 +1,10 @@
+<p align="center">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-dark.svg">
+        <img src="assets/brand/logo.svg" alt="Passenger" height="72">
+    </picture>
+</p>
+
 # Fleetbase Passenger
 
 [![CI](https://github.com/fleetbase/passenger-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fleetbase/passenger-app/actions/workflows/ci.yml)
@@ -141,7 +148,9 @@ Don't edit the templates at the repository root. A client build keeps its own fi
 
 Each file is optional. A missing one falls back to the root template. Run `yarn brand:link` after adding or removing a file; `yarn install` and the bundlers run it too.
 
-The native app name and identifier (`Passenger`, `io.fleetbase.passenger`) are the defaults. A store build for an operator sets its own when it's published.
+The native app name and identifier (`Passenger`, `io.fleetbase.passenger`), and the app icon, are the defaults. A store build for an operator sets its own when it's published.
+
+The default icon and logo are in `assets/brand/`: `icon.svg` (the app icon), `icon-foreground.svg` (Android's adaptive icon layer, on Fleetbase blue `#4391EA`), and `logo.svg` and `logo-dark.svg` (for light and dark backgrounds). The iOS, Android and web icons are rendered from `icon.svg`.
 
 ## How it's built
 

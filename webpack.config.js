@@ -68,6 +68,7 @@ module.exports = (env, { mode = 'development' }) => ({
         new HtmlWebpackPlugin({
             title: require('./app.json').displayName,
             template: path.resolve(__dirname, 'web/index.html'),
+            favicon: path.resolve(__dirname, 'web/favicon.png'),
         }),
     ],
     performance: { hints: false },
