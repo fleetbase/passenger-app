@@ -22,10 +22,20 @@ type QuoteResource = {
     service_name: string;
     amount: number;
     currency: string;
-    meta?: { seats?: number | null; pickup_eta?: number | null };
+    seats?: number | null;
+    pickup_eta?: number | null;
 };
 
-type FareResource = { total: number; currency: string; lines?: { label: string; amount: number }[] };
+type FareResource = {
+    final: boolean;
+    total: number;
+    currency: string;
+    estimate?: number | null;
+    distance?: number | null;
+    time?: number | null;
+    service?: string | null;
+    lines?: { label: string; amount: number }[];
+};
 
 type OrderResource = {
     id: string;
@@ -37,7 +47,10 @@ type OrderResource = {
     time?: number;
     transaction_amount?: number | null;
     currency?: string | null;
-    meta?: { service_name?: string; dispatch_outcome?: string; payment?: string; fare?: FareResource };
+    fare?: FareResource | null;
+    payment_method?: string | null;
+    dispatch_outcome?: string | null;
+    paid_at?: string | null;
     payload?: { pickup?: PlaceResource | null; dropoff?: PlaceResource | null; payment_method?: string | null } | null;
 };
 
@@ -79,7 +92,7 @@ const RIDE_STATUS: Record<string, RideStatus> = {
 };
 
 const rideStatus = (order: OrderResource): RideStatus =>
-    order.status === 'canceled' && order.meta?.dispatch_outcome === 'no_driver_found' ? 'no_driver' : (RIDE_STATUS[order.status] ?? 'searching');
+    order.dispatch_outcome === 'no_driver_found' ? 'no_driver' : (RIDE_STATUS[order.status] ?? 'searching');
 
 const isLive = (status: RideStatus) => status === 'driver_en_route' || status === 'arrived' || status === 'in_progress';
 
@@ -138,20 +151,26 @@ const formatMoney = (amount: number, currency: string) => {
     return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
 };
 
+/** The distance and time the trip was priced on. */
 const toSummary = (order: OrderResource) => {
-    if (!order.distance || !order.time) {
+    const { distance, time } = order.fare ?? {};
+    if (!distance || !time) {
         return undefined;
     }
-    return `${(order.distance / 1000).toFixed(1)} km · ${Math.round(order.time / 60)} min`;
+    return `${(distance / 1000).toFixed(1)} km · ${Math.round(time / 60)} min`;
 };
 
-/** The final fare, from the breakdown the server stores when the trip ends, or the fare agreed at booking. */
+/** The fare the order was bought at, with its lines, and the price first booked as the estimate. */
 const toFare = (order: OrderResource, estimate: string): FinalFare | undefined => {
-    const fare = order.meta?.fare;
-    if (fare) {
-        return { total: formatMoney(fare.total, fare.currency), estimate, lines: (fare.lines ?? []).map((line) => ({ label: line.label, amount: formatMoney(line.amount, fare.currency) })) };
+    const fare = order.fare;
+    if (!fare) {
+        return undefined;
     }
-    return order.transaction_amount && order.currency ? { total: formatMoney(order.transaction_amount, order.currency), estimate, lines: [] } : undefined;
+    return {
+        total: formatMoney(fare.total, fare.currency),
+        estimate: typeof fare.estimate === 'number' ? formatMoney(fare.estimate, fare.currency) : estimate,
+        lines: (fare.lines ?? []).map((line) => ({ label: line.label, amount: formatMoney(line.amount, fare.currency) })),
+    };
 };
 
 const toTrip = (order: OrderResource): Trip | undefined => {
@@ -165,11 +184,12 @@ const toTrip = (order: OrderResource): Trip | undefined => {
         id: order.id,
         status: order.status,
         date: order.created_at,
-        className: order.meta?.service_name ?? '',
+        className: order.fare?.service ?? '',
         pickup,
         dropoff,
         route: [pickup.location, dropoff.location],
         payment: method === 'cash' || method === 'card' ? method : undefined,
+        paid: order.paid_at ? true : undefined,
         fare: toFare(order, ''),
         summary: toSummary(order),
     };
@@ -415,8 +435,8 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                     id: quote.service_rate,
                     className: quote.service_name,
                     fare: formatMoney(quote.amount, quote.currency),
-                    seats: quote.meta?.seats ?? undefined,
-                    pickupMinutes: minutes(quote.meta?.pickup_eta),
+                    seats: quote.seats ?? undefined,
+                    pickupMinutes: minutes(quote.pickup_eta),
                 })
             );
         },
@@ -427,7 +447,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                 throw new Error('That option is no longer available. Choose another.');
             }
             const order = await asRider<OrderResource>((api, options) =>
-                api.post('customers/orders', { type: 'ride', service_quote: stored.id, pickup: placeInput(from), dropoff: placeInput(to), meta: { payment } }, options)
+                api.post('customers/orders', { type: 'ride', service_quote: stored.id, pickup: placeInput(from), dropoff: placeInput(to), payment_method: payment }, options)
             );
             await asRider((api, options) => api.post(`customers/orders/${order.id}/dispatch`, {}, options));
             const ride: Ride = { id: order.id, status: 'searching', pickup: from, dropoff: to, quote, payment, route: [from.location, to.location] };
@@ -442,13 +462,13 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             if (!order || !pickup || !dropoff) {
                 return undefined;
             }
-            const method = order.meta?.payment;
+            const method = order.payload?.payment_method;
             const ride: Ride = {
                 id: order.id,
                 status: rideStatus(order),
                 pickup,
                 dropoff,
-                quote: { id: '', className: order.meta?.service_name ?? '', fare: order.transaction_amount && order.currency ? formatMoney(order.transaction_amount, order.currency) : '' },
+                quote: { id: '', className: order.fare?.service ?? '', fare: order.fare ? formatMoney(order.fare.total, order.fare.currency) : '' },
                 payment: method === 'card' ? 'card' : 'cash',
                 route: [pickup.location, dropoff.location],
             };

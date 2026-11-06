@@ -107,8 +107,8 @@ test('quotes use the rate as id, format the smallest unit, and show seats and pi
         'GET service-quotes': () => [
             200,
             [
-                { service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD', meta: { seats: null, pickup_eta: null } },
-                { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY', meta: { seats: 6, pickup_eta: 200 } },
+                { service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD', seats: null, pickup_eta: null },
+                { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY', seats: 6, pickup_eta: 200 },
             ],
         ],
     });
@@ -130,15 +130,18 @@ test('history shows finished trips only, newest first, without claiming how they
     const order = (id: string, status: string, created_at: string, extra = {}) => ({ id, status, created_at, payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36) }, ...extra });
     const { service } = await signedIn({
         'GET customers/orders': () => [200, [
-            order('order_old', 'completed', '2026-11-01T00:00:00Z', { transaction_amount: 2340, currency: 'USD', distance: 21000, time: 1500 }),
+            order('order_old', 'completed', '2026-11-01T00:00:00Z', { fare: { final: true, total: 2340, currency: 'USD', estimate: 2100, distance: 21000, time: 1500, service: 'Economy', lines: [] } }),
+            order('order_paid', 'completed', '2026-10-30T00:00:00Z', { paid_at: '2026-10-30T01:00:00Z', payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36), payment_method: 'card' } }),
             order('order_active', 'created', '2026-11-04T00:00:00Z'),
             order('order_new', 'canceled', '2026-11-03T00:00:00Z'),
         ]],
     });
     const trips = await service.trips();
-    expect(trips.map((trip) => trip.id)).toEqual(['order_new', 'order_old']);
-    expect(trips[1]).toMatchObject({ summary: '21.0 km · 25 min', className: '' });
+    expect(trips.map((trip) => trip.id)).toEqual(['order_new', 'order_old', 'order_paid']);
+    expect(trips[2]).toMatchObject({ payment: 'card', paid: true });
+    expect(trips[1]).toMatchObject({ summary: '21.0 km · 25 min', className: 'Economy' });
     expect(trips[1].fare?.total).toContain('23.40');
+    expect(trips[1].fare?.estimate).toContain('21.00');
     expect(trips[1].payment).toBeUndefined();
     expect(trips[1].paid).toBeUndefined();
     expect(trips[0].fare).toBeUndefined();
@@ -289,7 +292,7 @@ describe('a ride', () => {
             service_quote: 'quote_stored',
             pickup: { name: '1 Raffles Place', street1: 'Downtown', latitude: 1.2841, longitude: 103.8511 },
             dropoff: { name: 'Bugis', street1: 'Bugis', latitude: 1.3005, longitude: 103.8452 },
-            meta: { payment: 'cash' },
+            payment_method: 'cash',
         });
 
         await tick();
@@ -310,7 +313,7 @@ describe('a ride', () => {
         expect(updates[updates.length - 1]).toMatchObject({ status: 'in_progress', etaMinutes: 7 });
         expect(sent.filter((request) => request.url.includes('/driver')).length).toBe(1);
 
-        status = order('completed', { meta: { fare: { total: 612, currency: 'USD', lines: [{ label: 'Base fare', amount: 300 }] } } });
+        status = order('completed', { fare: { final: true, total: 612, currency: 'USD', estimate: null, lines: [{ label: 'Base fare', amount: 300 }] } });
         await tick();
         const done = updates[updates.length - 1];
         expect(done.status).toBe('completed');
@@ -337,13 +340,13 @@ describe('a ride', () => {
         expect(updates[0]).toMatchObject({ status: 'driver_en_route', stale: true, driver: { name: 'Chen', rating: undefined, plate: '' } });
         expect(updates[0].etaMinutes).toBeUndefined();
 
-        status = order('canceled', { meta: { dispatch_outcome: 'no_driver_found' } });
+        status = order('canceled', { dispatch_outcome: 'no_driver_found' });
         await tick();
         expect(updates[updates.length - 1].status).toBe('no_driver');
     });
 
     test('a ride under way is picked up again after a restart, and finished ones are not', async () => {
-        const live = { id: 'order_ride', type: 'ride', dispatched: true, status: 'arrived', created_at: '2026-11-06T01:00:00Z', transaction_amount: 555, currency: 'USD', meta: { service_name: 'Economy', payment: 'card' }, payload: { pickup: place('Raffles', 103.85, 1.28), dropoff: place('Bugis', 103.84, 1.3) } };
+        const live = { id: 'order_ride', type: 'ride', dispatched: true, status: 'arrived', created_at: '2026-11-06T01:00:00Z', fare: { final: false, total: 555, currency: 'USD', service: 'Economy' }, payload: { pickup: place('Raffles', 103.85, 1.28), dropoff: place('Bugis', 103.84, 1.3), payment_method: 'card' } };
         let orders: unknown[] = [{ ...live, id: 'order_old', status: 'completed' }, { ...live, id: 'order_parcel', type: 'transport' }, live];
         const { service, sent } = await signedIn({
             'GET customers/orders': () => [200, orders],
