@@ -1,5 +1,12 @@
 # Fleetbase Passenger
 
+[![CI](https://github.com/fleetbase/passenger-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fleetbase/passenger-app/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/fleetbase/passenger-app?label=release)](https://github.com/fleetbase/passenger-app/releases)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE.md)
+![Platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20web-lightgrey)
+![React Native](https://img.shields.io/badge/React%20Native-0.86-61dafb?logo=react)
+[![Discord](https://img.shields.io/discord/699834923032248430?logo=discord&label=discord)](https://discord.gg/V7RVWRQ2Wm)
+
 An open-source passenger app for ride-hailing, built on [Fleetbase](https://github.com/fleetbase/fleetbase) and Fleet-Ops. Taxi and private-hire operators rebrand it and publish it as their own app, so riders only see the operator's name. [Navigator](https://github.com/fleetbase/navigator-app) is the matching driver app.
 
 It runs on iOS, Android and the web, from one React Native codebase.
@@ -35,7 +42,7 @@ It runs on iOS, Android and the web, from one React Native codebase.
 ## What the server needs
 
 - **Fleetbase with Fleet-Ops** from the `release/v0.7.0` line. The rider routes, timed offers and ride fields come from [fleetbase/fleetops#424](https://github.com/fleetbase/fleetops/pull/424), which isn't merged yet.
-- **An API key with the `rider` profile,** so the key only reaches rider routes. Key profiles come from [fleetbase/core-api#329](https://github.com/fleetbase/core-api/pull/329), also not merged yet. Don't ship an unscoped key in a public app.
+- **A Fleetbase API key** for the operator's company, from Developers → API Keys in the Console. The key is built into the app, so anyone who has the app can read it. Fleetbase can't yet limit what a key reaches; that will come with permissions and roles for API keys in IAM. Until then, don't publish a build to the public.
 - **A ride order config** for the operator's company:
 
   ```bash
@@ -97,7 +104,7 @@ GOOGLE_MAPS_API_KEY=your-key
 
 ### The web build
 
-`yarn web` serves the app at http://localhost:8092 and proxies API requests to `PASSENGER_HOST`. `yarn web:build` writes a production build to `dist/`.
+`yarn web` serves the app at http://localhost:8092 and proxies API requests to `FLEETBASE_HOST`. `yarn web:build` writes a production build to `dist/`.
 
 - A deployed site calls the API directly, so its address must be in the API's `FRONTEND_HOSTS`, or browsers block every request.
 - The web build uses Leaflet in place of the native map, with OpenStreetMap tiles by default. OpenStreetMap's tile servers aren't meant for heavy production use, so set `webMapTiles` in the brand file before going live.
@@ -108,8 +115,8 @@ Settings are read from `.env` (or the environment) when the app is built, by `sc
 
 | Setting | What it is |
 |---|---|
-| `PASSENGER_HOST` | Your Fleetbase API, for example `http://localhost:8000`. Android emulators reach this machine at `10.0.2.2`, and the app handles that. |
-| `PASSENGER_KEY` | A public API key with the `rider` profile. |
+| `FLEETBASE_HOST` | Your Fleetbase API, for example `http://localhost:8000`. Android emulators reach this machine at `10.0.2.2`, and the app handles that. |
+| `FLEETBASE_API_KEY` | The operator's Fleetbase API key, from Developers → API Keys in the Console. |
 | `PASSENGER_SAMPLE_DATA` | `true` runs on built-in sample data with no server. |
 
 ## Sample data
