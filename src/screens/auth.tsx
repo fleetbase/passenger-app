@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { YStack } from 'tamagui';
-import brand from '../../passenger.brand';
+import { BrandLogo } from '../branding/BrandLogo';
+import { failureText } from '../services/errors';
 import { useApp } from '../state/AppContext';
 import { Banner, Button, Field, Screen, T } from '../ui';
 
@@ -11,6 +12,8 @@ export function SignInScreen() {
     const [phone, setPhone] = useState('');
     const [code, setCode] = useState('');
     const [codeSent, setCodeSent] = useState(false);
+    const [newRider, setNewRider] = useState(false);
+    const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
 
@@ -20,8 +23,8 @@ export function SignInScreen() {
         try {
             await service.requestCode(phone);
             setCodeSent(true);
-        } catch {
-            setError("We couldn't send a code. Check the number and try again.");
+        } catch (cause) {
+            setError(failureText(cause, "We couldn't send a code. Check the number and try again."));
         } finally {
             setBusy(false);
         }
@@ -31,10 +34,15 @@ export function SignInScreen() {
         setBusy(true);
         setError(undefined);
         try {
-            const { firstName } = await service.verifyCode(phone, code);
-            signIn(firstName);
-        } catch {
-            setError("That code isn't right. Check it and try again.");
+            const result = await service.verifyCode(phone, code, newRider ? name.trim() : undefined);
+            if (result === 'needs-name') {
+                setNewRider(true);
+            } else {
+                signIn(result);
+            }
+        } catch (cause) {
+            // The API answers 400 for a wrong code. Anything else is the network or the server.
+            setError((cause as { status?: number }).status === 400 ? "That code isn't right. Check it and try again." : failureText(cause, "We couldn't check your code. Try again."));
         } finally {
             setBusy(false);
         }
@@ -43,12 +51,18 @@ export function SignInScreen() {
     return (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Screen>
-                <T variant='action' fontWeight='800' tone='$ink'>{brand.name}</T>
+                <BrandLogo />
                 {codeSent ? (
                     <>
-                        <T variant='display'>Enter your code</T>
-                        <T tone='$sub'>Sent to {phone}</T>
-                        <Field label='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' placeholder='6 digits' textContentType='oneTimeCode' autoFocus />
+                        <T variant='display'>{newRider ? "What's your name?" : 'Enter your code'}</T>
+                        {newRider ? (
+                            <Field label='Your name' value={name} onChangeText={setName} textContentType='name' autoCorrect={false} autoFocus />
+                        ) : (
+                            <>
+                                <T tone='$sub'>Sent to {phone}</T>
+                                <Field label='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' placeholder='6 digits' textContentType='oneTimeCode' autoFocus />
+                            </>
+                        )}
                     </>
                 ) : (
                     <>
@@ -59,7 +73,7 @@ export function SignInScreen() {
                 )}
                 {error ? <Banner text={error} tone='danger' /> : null}
                 <YStack flex={1} />
-                {codeSent ? <Button label='Verify' onPress={verify} loading={busy} disabled={code.length < 4} /> : <Button label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
+                {codeSent ? <Button label={newRider ? 'Continue' : 'Verify'} onPress={verify} loading={busy} disabled={code.length < 4 || (newRider && !name.trim())} /> : <Button label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
             </Screen>
         </KeyboardAvoidingView>
     );

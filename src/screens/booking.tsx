@@ -1,27 +1,61 @@
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 import { useTheme, XStack, YStack } from 'tamagui';
-import brand from '../../passenger.brand';
+import { BrandLogo } from '../branding/BrandLogo';
+import { componentSlot } from '../extensions/components/component-slot';
+import type { ComponentPropsMap } from '../extensions/components/types';
 import type { RootStack } from '../navigation';
+import { failureText } from '../services/errors';
 import type { PaymentMethod, Place, Quote } from '../services/types';
 import { useApp } from '../state/AppContext';
-import { BottomStack, Button, Card, Field, floating, Icon, RoundButton, Row, Screen, T, TopStack } from '../ui';
+import { Banner, BottomStack, Button, Card, Field, floating, Icon, RoundButton, Row, Screen, T, TopStack } from '../ui';
 import { RideMap } from '../ui/RideMap';
 
 const FALLBACK_CENTER = { latitude: 1.2847, longitude: 103.8511 };
 
+const ClassCard = componentSlot('booking.classCard', function DefaultClassCard({ quote, index, selected, onPress }: ComponentPropsMap['booking.classCard']) {
+    const theme = useTheme();
+    return (
+        <Pressable style={{ flex: 1 }} accessibilityRole='radio' accessibilityState={{ selected }} onPress={onPress}>
+            <YStack borderRadius={24} backgroundColor='$surface' borderWidth={3} borderColor={selected ? '$route' : 'transparent'} padding={16} gap={6} {...floating}>
+                <Icon name={index === 0 ? 'car' : 'van'} size={44} color={selected ? theme.route.val : theme.sub.val} />
+                <T variant='action'>{quote?.className ?? ' '}</T>
+                <T variant='secondary' tone='$sub'>{quote?.seats && quote.pickupMinutes ? `${quote.seats} seats · ${quote.pickupMinutes} min` : ' '}</T>
+                {quote ? <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{quote.fare}</T> : <YStack width={90} height={32} borderRadius={8} backgroundColor='$raised' />}
+                <T variant='caption' tone='$sub'>Estimated fare</T>
+            </YStack>
+        </Pressable>
+    );
+});
+
 /** R7. */
 export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Home'>) {
-    const { service, firstName, setDropoff } = useApp();
+    const { service, profile, setDropoff, ride } = useApp();
     const theme = useTheme();
     const [pickup, setPickup] = useState<Place>();
+
+    // A ride picked up again after a restart goes straight back to its screen.
+    const rideId = ride?.id;
+    useEffect(() => {
+        if (rideId) {
+            navigation.navigate('Ride');
+        }
+    }, [rideId, navigation]);
     const [saved, setSaved] = useState<Place[]>([]);
+    const [error, setError] = useState<string>();
 
     useEffect(() => {
-        service.currentPickup().then(setPickup);
-        service.savedPlaces().then(setSaved);
+        service.currentPickup().then(setPickup).catch((cause) => setError(failureText(cause, "We couldn't find your location. Try again.")));
     }, [service]);
+
+    // Saved places can change on the account screens.
+    useFocusEffect(
+        useCallback(() => {
+            service.savedPlaces().then(setSaved).catch((cause) => setError(failureText(cause, "We couldn't load your places. Check your connection and try again.")));
+        }, [service])
+    );
 
     const goTo = (place: Place) => {
         setDropoff(place);
@@ -34,18 +68,19 @@ export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ho
             <TopStack>
                 <XStack justifyContent='space-between' alignItems='center'>
                     <YStack height={48} paddingHorizontal={18} borderRadius={24} backgroundColor='$surface' justifyContent='center' {...floating}>
-                        <T variant='strong' fontWeight='700'>{brand.name}</T>
+                        <BrandLogo />
                     </YStack>
-                    <RoundButton icon='user' label='Account' />
+                    <RoundButton icon='user' label='Account' onPress={() => navigation.navigate('Account')} />
                 </XStack>
             </TopStack>
             <BottomStack>
+                {error ? <Banner tone='danger' text={error} /> : null}
                 <XStack gap={8}>
-                    {saved.map((place) => (
+                    {saved.slice(0, 2).map((place) => (
                         <Pressable key={place.id} style={{ flex: 1 }} accessibilityRole='button' onPress={() => goTo(place)}>
                             <XStack height={72} borderRadius={24} backgroundColor='$surface' alignItems='center' gap={10} paddingHorizontal={14} {...floating}>
                                 <YStack width={40} height={40} borderRadius={20} backgroundColor='$tint' alignItems='center' justifyContent='center'>
-                                    <Icon name={place.saved === 'home' ? 'home' : 'work'} size={20} color={theme.ink.val} />
+                                    <Icon name={place.saved === 'home' ? 'home' : place.saved === 'work' ? 'work' : 'pin'} size={20} color={theme.ink.val} />
                                 </YStack>
                                 <YStack flex={1}>
                                     <T variant='strong' fontWeight='700'>{place.name}</T>
@@ -56,7 +91,7 @@ export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ho
                     ))}
                 </XStack>
                 <Card>
-                    <T variant='title'>Where are you going{firstName ? `, ${firstName}` : ''}?</T>
+                    <T variant='title'>Where are you going{profile ? `, ${profile.firstName}` : ''}?</T>
                     <Pressable accessibilityRole='button' onPress={() => navigation.navigate('Destination')}>
                         <XStack height={60} borderRadius={30} backgroundColor='$accent' alignItems='center' gap={12} paddingHorizontal={20}>
                             <Icon name='search' color={theme.on.val} />
@@ -75,16 +110,33 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
     const [pickup, setPickup] = useState<Place>();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Place[]>([]);
+    const [searched, setSearched] = useState(false);
+    const [pickupError, setPickupError] = useState<string>();
+    const [searchError, setSearchError] = useState<string>();
 
     useEffect(() => {
-        service.currentPickup().then(setPickup);
+        service.currentPickup().then(setPickup).catch((cause) => setPickupError(failureText(cause, "We couldn't find your location. Try again.")));
     }, [service]);
 
     useEffect(() => {
         let current = true;
-        service.searchPlaces(query).then((places) => current && setResults(places));
+        setSearched(false);
+        // Every search goes to the server, so wait for a pause in typing.
+        const timer = setTimeout(() => {
+            service
+                .searchPlaces(query)
+                .then((places) => {
+                    if (current) {
+                        setSearchError(undefined);
+                        setResults(places);
+                        setSearched(true);
+                    }
+                })
+                .catch((cause) => current && setSearchError(failureText(cause, "We couldn't search for places. Check your connection and try again.")));
+        }, query ? 300 : 0);
         return () => {
             current = false;
+            clearTimeout(timer);
         };
     }, [service, query]);
 
@@ -94,6 +146,7 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
                 <RoundButton icon='back' label='Back' onPress={navigation.goBack} />
             </XStack>
             <Field label='Pickup' value={pickup?.name ?? ''} editable={false} />
+            {pickupError ? <Banner tone='danger' text={pickupError} /> : null}
             <Field label='Dropoff' value={query} onChangeText={setQuery} placeholder='Where to?' autoFocus autoCorrect={false} />
             <ScrollView keyboardShouldPersistTaps='handled'>
                 {results.map((place, index) => (
@@ -109,7 +162,9 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
                         }}
                     />
                 ))}
-                {results.length === 0 ? <T tone='$sub'>No places found. Check the spelling and try again.</T> : null}
+                {searchError ? <Banner tone='danger' text={searchError} /> : null}
+                {!searchError && !searched && query.trim() ? <T tone='$sub'>Searching…</T> : null}
+                {!searchError && searched && query.trim() && results.length === 0 ? <T tone='$sub'>No places found. Check the spelling and try again.</T> : null}
             </ScrollView>
         </Screen>
     );
@@ -124,16 +179,21 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
     const [selected, setSelected] = useState<string>();
     const [payment, setPayment] = useState<PaymentMethod>('cash');
     const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string>();
 
     useEffect(() => {
-        service.currentPickup().then(async (place) => {
-            setPickup(place);
-            if (dropoff) {
-                const found = await service.quotes(place, dropoff);
-                setQuotes(found);
-                setSelected(found[0]?.id);
-            }
-        });
+        service
+            .currentPickup()
+            .then(async (place) => {
+                setPickup(place);
+                if (dropoff) {
+                    const found = await service.quotes(place, dropoff);
+                    setQuotes(found);
+                    setSelected(found[0]?.id);
+                    setError(found.length ? undefined : "There are no rides available for this trip.");
+                }
+            })
+            .catch((cause) => setError(failureText(cause, "We couldn't get fares for this trip. Go back and try again.")));
     }, [service, dropoff]);
 
     const quote = quotes?.find((item) => item.id === selected);
@@ -143,9 +203,15 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
             return;
         }
         setBusy(true);
-        await requestRide({ pickup, quote, payment });
-        setBusy(false);
-        navigation.reset({ index: 0, routes: [{ name: 'Ride' }] });
+        setError(undefined);
+        try {
+            await requestRide({ pickup, quote, payment });
+            navigation.reset({ index: 0, routes: [{ name: 'Ride' }] });
+        } catch (cause) {
+            setError(failureText(cause, "We couldn't request your ride. Try again."));
+        } finally {
+            setBusy(false);
+        }
     };
 
     return (
@@ -154,7 +220,7 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
                 center={pickup?.location ?? FALLBACK_CENTER}
                 pickup={pickup?.location}
                 dropoff={dropoff?.location}
-                route={pickup && dropoff ? [pickup.location, { latitude: dropoff.location.latitude, longitude: pickup.location.longitude }, dropoff.location] : undefined}
+                route={pickup && dropoff ? [pickup.location, dropoff.location] : undefined}
                 insets={{ top: 130, bottom: 410 }}
             />
             <TopStack>
@@ -166,26 +232,10 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
                 </XStack>
             </TopStack>
             <BottomStack>
+                {error ? <Banner tone='danger' text={error} /> : null}
                 <XStack gap={10}>
                     {(quotes ?? [undefined, undefined]).map((item, index) => {
-                        const on = item ? item.id === selected : false;
-                        return (
-                            <Pressable
-                                key={item?.id ?? index}
-                                style={{ flex: 1 }}
-                                accessibilityRole='radio'
-                                accessibilityState={{ selected: on }}
-                                onPress={() => item && setSelected(item.id)}
-                            >
-                                <YStack borderRadius={24} backgroundColor='$surface' borderWidth={3} borderColor={on ? '$route' : 'transparent'} padding={16} gap={6} {...floating}>
-                                    <Icon name={index === 0 ? 'car' : 'van'} size={44} color={on ? theme.route.val : theme.sub.val} />
-                                    <T variant='action'>{item?.className ?? ' '}</T>
-                                    <T variant='secondary' tone='$sub'>{item ? `${item.seats} seats · ${item.pickupMinutes} min` : ' '}</T>
-                                    {item ? <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{item.fare}</T> : <YStack width={90} height={32} borderRadius={8} backgroundColor='$raised' />}
-                                    <T variant='caption' tone='$sub'>Estimated fare</T>
-                                </YStack>
-                            </Pressable>
-                        );
+                        return <ClassCard key={item?.id ?? index} quote={item} index={index} selected={item ? item.id === selected : false} onPress={() => item && setSelected(item.id)} />;
                     })}
                 </XStack>
                 <Card padding={12} gap={8}>
@@ -196,7 +246,7 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
                             <T variant='secondary' tone='$sub' fontWeight='600'>Change</T>
                         </XStack>
                     </Pressable>
-                    <Button label={quote ? `Request ${quote.className}` : 'Getting fares'} onPress={request} disabled={!quote} loading={busy} />
+                    <Button label={quote ? `Request ${quote.className}` : quotes ? 'No rides available' : 'Getting fares'} onPress={request} disabled={!quote} loading={busy} />
                 </Card>
             </BottomStack>
         </YStack>
