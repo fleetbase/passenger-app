@@ -1,6 +1,6 @@
 export class NotConfiguredError extends Error {
     constructor() {
-        super('This app has no Fleetbase server set. Set PASSENGER_HOST and PASSENGER_KEY in .env.');
+        super('This app has no Fleetbase server set. Set FLEETBASE_HOST and FLEETBASE_API_KEY in .env.');
     }
 }
 

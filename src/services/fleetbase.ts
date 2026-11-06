@@ -208,7 +208,7 @@ const reachableHost = (host: string) => {
 };
 
 /**
- * `RideService` on the Fleet-Ops API, using a key with the rider profile. Rider data is connected; the rest is added milestone by
+ * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Rider data is connected; the rest is added milestone by
  * milestone (see ride-hailing/FLEETOPS-INTEGRATION-PLAN.md) and fails clearly until then.
  */
 export function createFleetbaseService({ host, key }: { host: string; key: string }): RideService {
