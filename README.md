@@ -49,7 +49,7 @@ It runs on iOS, Android and the web, from one React Native codebase.
 
 ## Getting started
 
-You need Node 20 (see `.nvmrc`), Yarn 3 through Corepack, Xcode with CocoaPods for iOS, and Android Studio for Android.
+You need Node 20 (see `.nvmrc`), Yarn 3 through Corepack, Xcode and Ruby 3.2 (see `.ruby-version`) for iOS, and Android Studio for Android. Bundler installs CocoaPods.
 
 ```bash
 corepack enable
@@ -61,6 +61,10 @@ yarn install
 
 ```bash
 cp .env.example .env
+```
+
+```bash
+bundle install
 ```
 
 ```bash
