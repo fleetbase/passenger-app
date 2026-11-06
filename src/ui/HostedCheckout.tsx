@@ -12,6 +12,14 @@ export function HostedCheckout({ checkout, onResult }: { checkout: Checkout; onR
                     onResult(nativeEvent.data);
                 }
             }}
+            // The operator's invoice page comes back with `payment=success` or `payment=cancelled`
+            // from the card provider. Either way the server decides whether the trip is paid.
+            onNavigationStateChange={({ url }) => {
+                const outcome = /[?&]payment=(success|cancelled)/.exec(url)?.[1];
+                if (outcome) {
+                    onResult(outcome === 'success' ? 'paid' : 'failed');
+                }
+            }}
         />
     );
 }

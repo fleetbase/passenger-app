@@ -21,7 +21,7 @@ module.exports = (env, { mode = 'development' }) => ({
         hot: true,
         // The API only accepts browser requests from its allowed origins, so development goes
         // through this server. A production site's address must be in the API's FRONTEND_HOSTS.
-        proxy: host ? [{ context: ['/v1'], target: host, changeOrigin: true }] : [],
+        proxy: host ? [{ context: ['/v1', '/ledger'], target: host, changeOrigin: true }] : [],
     },
     module: {
         rules: [

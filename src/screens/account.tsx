@@ -109,9 +109,11 @@ export function DeleteAccountScreen({ navigation }: NativeStackScreenProps<RootS
     );
 }
 
-/** R33. Everything here comes from the operator's brand file. */
+/** R33. From the operator's ride settings, else their brand file. */
 export function HelpScreen({ navigation }: NativeStackScreenProps<RootStack, 'Help'>) {
-    const { phone, email, termsUrl } = brand.support ?? {};
+    const { contacts } = useApp();
+    const { supportPhone: phone, supportEmail: email } = contacts;
+    const termsUrl = brand.support?.termsUrl;
     return (
         <Screen>
             <Header title='Help' onBack={navigation.goBack} />

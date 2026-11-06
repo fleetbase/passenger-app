@@ -221,6 +221,9 @@ export function createStubService(): RideService {
             places = places.filter((place) => !place.saved);
             trips = [];
         },
+        async rideSettings() {
+            return {};
+        },
         async currentPickup() {
             return PICKUP;
         },
@@ -261,6 +264,9 @@ export function createStubService(): RideService {
             active = { ride, timers: [], canceled: false };
             run(active, onUpdate);
             return ride;
+        },
+        async activeRide() {
+            return active && !active.canceled ? active.ride : undefined;
         },
         async cancelRide() {
             if (active) {

@@ -32,9 +32,17 @@ const ClassCard = componentSlot('booking.classCard', function DefaultClassCard({
 
 /** R7. */
 export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Home'>) {
-    const { service, profile, setDropoff } = useApp();
+    const { service, profile, setDropoff, ride } = useApp();
     const theme = useTheme();
     const [pickup, setPickup] = useState<Place>();
+
+    // A ride picked up again after a restart goes straight back to its screen.
+    const rideId = ride?.id;
+    useEffect(() => {
+        if (rideId) {
+            navigation.navigate('Ride');
+        }
+    }, [rideId, navigation]);
     const [saved, setSaved] = useState<Place[]>([]);
     const [error, setError] = useState<string>();
 

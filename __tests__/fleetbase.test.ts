@@ -1,6 +1,5 @@
-import { NotConnectedError } from '../src/services/errors';
 import { createFleetbaseService } from '../src/services/fleetbase';
-import { clearSession, readSession, saveSession } from '../src/services/session';
+import { clearSession, readSession } from '../src/services/session';
 
 jest.mock('../src/services/location', () => ({ currentPosition: jest.fn(async () => ({ latitude: 1.28, longitude: 103.85 })) }));
 jest.mock('../src/services/session', () => ({
@@ -15,7 +14,7 @@ const respondWith = (routes: Record<string, () => [number, unknown]>) => {
     const sent: Sent[] = [];
     (globalThis as any).fetch = jest.fn(async (url: string, init: RequestInit) => {
         sent.push({ url, method: init.method!, headers: new Headers(init.headers), body: init.body ? JSON.parse(init.body as string) : undefined });
-        const path = url.replace('http://api.test/v1/', '').split('?')[0];
+        const path = url.replace(/^http:\/\/api\.test\/(v1\/)?/, '').split('?')[0];
         const [status, payload] = routes[`${init.method} ${path}`]?.() ?? [404, { error: `No route for ${path}` }];
         return new Response(JSON.stringify(payload), { status });
     });
@@ -103,9 +102,15 @@ test('signing out clears the session even if the server call fails', async () =>
     await expect(service.savedPlaces()).rejects.toThrow('No rider is signed in');
 });
 
-test('quotes use the rate as id, format the smallest unit and leave seats and ETA empty', async () => {
+test('quotes use the rate as id, format the smallest unit, and show seats and pickup time when known', async () => {
     const { service, sent } = await signedIn({
-        'GET service-quotes': () => [200, [{ service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD' }, { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY' }]],
+        'GET service-quotes': () => [
+            200,
+            [
+                { service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD', meta: { seats: null, pickup_eta: null } },
+                { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY', meta: { seats: 6, pickup_eta: 200 } },
+            ],
+        ],
     });
     const from = { id: 'current-location', name: 'Current location', detail: '', location: { latitude: 1.2, longitude: 103.8 } };
     const to = { id: 'place_abc', name: 'Airport', detail: '', location: { latitude: 1.3, longitude: 103.9 } };
@@ -116,7 +121,9 @@ test('quotes use the rate as id, format the smallest unit and leave seats and ET
     expect(url).toContain('preview=1');
     expect(quotes[0]).toEqual({ id: 'service_a', className: 'Economy', fare: expect.stringContaining('25.75') });
     expect(quotes[1].fare).toContain('3,400');
+    expect(url).toContain('availability=1');
     expect(quotes[0].seats).toBeUndefined();
+    expect(quotes[1]).toMatchObject({ seats: 6, pickupMinutes: 3 });
 });
 
 test('history shows finished trips only, newest first, without claiming how they were paid', async () => {
@@ -159,9 +166,50 @@ test('a place found by the geocoder gets a stable id and quotes by location', as
     expect(decodeURIComponent(sent[sent.length - 1].url)).toContain('dropoff[latitude]=1.27');
 });
 
-test('parts not built yet fail as not connected', async () => {
-    const { service } = await signedIn({});
-    await expect(service.deleteAccount()).rejects.toBeInstanceOf(NotConnectedError);
+test('deleting the account ends the session', async () => {
+    const { service, sent } = await signedIn({ 'DELETE customers/me': () => [200, { status: 'deleted' }] });
+    await service.deleteAccount();
+    expect(sent[sent.length - 1]).toMatchObject({ method: 'DELETE' });
+    expect(clearSession).toHaveBeenCalled();
+    await expect(service.savedPlaces()).rejects.toThrow('No rider is signed in');
+});
+
+test('the operator settings override the brand, and stay unset when missing', async () => {
+    const { service, sent } = await signedIn({ 'GET customers/ride-settings': () => [200, { emergency_number: '995', support: { phone: null, email: 'help@cabs.test' } }] });
+    await expect(service.rideSettings()).resolves.toEqual({ emergencyNumber: '995', supportPhone: undefined, supportEmail: 'help@cabs.test' });
+    expect(sent[sent.length - 1].headers.get('Customer-Token')).toBe('rider-token');
+});
+
+test('a rating and a share link go to the ride', async () => {
+    const { service, sent } = await signedIn({
+        'POST customers/orders/order_ride/rating': () => [200, { status: 'rated' }],
+        'POST customers/orders/order_ride/share': () => [200, { url: 'https://console.test/~/track/PAS1?share=1.abc' }],
+    });
+    await service.rateDriver('order_ride', 4, '  ');
+    expect(sent[sent.length - 1].body).toEqual({ stars: 4 });
+    await service.rateDriver('order_ride', 5, ' Lovely ');
+    expect(sent[sent.length - 1].body).toEqual({ stars: 5, comment: 'Lovely' });
+    await expect(service.shareLink('order_ride')).resolves.toBe('https://console.test/~/track/PAS1?share=1.abc');
+});
+
+test('paying opens the hosted invoice page, and only the invoice says whether it is paid', async () => {
+    let status = 'sent';
+    const { service, sent } = await signedIn({
+        'GET ledger/v1/customers/orders/order_ride/invoice': () => [200, { invoice: { id: 'invoice_1', status, payment_url: 'https://console.test/~/invoice?id=invoice_1' } }],
+        'GET ledger/v1/customers/orders/order_none/invoice': () => [200, { invoice: null }],
+    });
+    await expect(service.createCheckout('order_ride')).resolves.toEqual({ uri: 'https://console.test/~/invoice?id=invoice_1' });
+    expect(sent[sent.length - 1].headers.get('Customer-Token')).toBe('rider-token');
+    await expect(service.confirmPayment('order_ride', 'paid')).resolves.toBe('failed');
+    status = 'paid';
+    await expect(service.confirmPayment('order_ride', 'failed')).resolves.toBe('paid');
+    await expect(service.createCheckout('order_none')).rejects.toThrow("isn't ready");
+    await expect(service.confirmPayment('order_none', 'paid')).resolves.toBe('failed');
+});
+
+test('paying needs a signed-in rider', async () => {
+    const service = createFleetbaseService({ host: 'http://api.test', key: 'flb_live_test' });
+    await expect(service.createCheckout('order_ride')).rejects.toThrow('No rider is signed in');
 });
 
 test('saving a place finds the address, then stores it for this rider', async () => {
@@ -203,3 +251,190 @@ test('places stored in capitals read normally, and mixed case is left alone', as
     expect(other.name).toBe('McDonald House');
 });
 
+
+const pickup = { id: 'current-location', name: '1 Raffles Place', detail: 'Downtown', location: { latitude: 1.2841, longitude: 103.8511 } };
+const dropoff = { id: 'place_abc', name: 'Bugis', detail: '', location: { latitude: 1.3005, longitude: 103.8452 } };
+const economy = { id: 'service_a', className: 'Economy', fare: '$5.33' };
+
+const order = (status: string, extra: Record<string, unknown> = {}) => [200, { id: 'order_ride', status, created_at: '2026-11-06T01:00:00Z', ...extra }] as [number, unknown];
+
+describe('a ride', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    const tick = async () => {
+        await jest.advanceTimersByTimeAsync(3000);
+    };
+
+    test('is booked with a fare the order can hold, then followed until the driver drops the rider off', async () => {
+        let status = order('dispatched');
+        const { service, sent } = await signedIn({
+            'GET service-quotes': () => [200, [{ id: 'quote_stored', service_rate: 'service_a', service_name: 'Economy', amount: 533, currency: 'USD' }]],
+            'POST customers/orders': () => [200, { id: 'order_ride', status: 'created' }],
+            'POST customers/orders/order_ride/dispatch': () => [200, { id: 'order_ride', status: 'dispatched' }],
+            'GET customers/orders/order_ride': () => status,
+            'GET customers/orders/order_ride/driver': () => [200, { driver: { name: 'Chen Test', rating: 4.86 }, vehicle: { make: 'Honda', model: 'Jazz', color: 'Silver', plate_number: 'KTX 5512' } }],
+            'GET customers/orders/order_ride/tracker': () => [200, { driver: { location: { coordinates: [103.8511, 1.287] }, location_age_seconds: 4 }, route: { legs: [{ duration_s: 130 }] }, eta: { completion_seconds: 420 } }],
+        });
+        const updates: any[] = [];
+        const ride = await service.requestRide({ pickup, dropoff, quote: economy, payment: 'cash' }, (next) => updates.push(next));
+
+        expect(ride).toMatchObject({ id: 'order_ride', status: 'searching' });
+        const stored = sent.find((request) => request.url.includes('service-quotes'))!;
+        expect(decodeURIComponent(stored.url)).toContain('service=service_a');
+        expect(stored.url).not.toContain('preview');
+        const created = sent.find((request) => request.method === 'POST' && request.url.endsWith('/customers/orders'))!;
+        expect(created.body).toEqual({
+            type: 'ride',
+            service_quote: 'quote_stored',
+            pickup: { name: '1 Raffles Place', street1: 'Downtown', latitude: 1.2841, longitude: 103.8511 },
+            dropoff: { name: 'Bugis', street1: 'Bugis', latitude: 1.3005, longitude: 103.8452 },
+            meta: { payment: 'cash' },
+        });
+
+        await tick();
+        expect(updates[updates.length - 1].status).toBe('searching');
+
+        status = order('started');
+        await tick();
+        expect(updates[updates.length - 1]).toMatchObject({
+            status: 'driver_en_route',
+            driver: { name: 'Chen Test', initials: 'CT', rating: 4.86, vehicle: 'Silver Honda Jazz', plate: 'KTX 5512' },
+            carPosition: { latitude: 1.287, longitude: 103.8511 },
+            stale: false,
+            etaMinutes: 2,
+        });
+
+        status = order('in_progress');
+        await tick();
+        expect(updates[updates.length - 1]).toMatchObject({ status: 'in_progress', etaMinutes: 7 });
+        expect(sent.filter((request) => request.url.includes('/driver')).length).toBe(1);
+
+        status = order('completed', { meta: { fare: { total: 612, currency: 'USD', lines: [{ label: 'Base fare', amount: 300 }] } } });
+        await tick();
+        const done = updates[updates.length - 1];
+        expect(done.status).toBe('completed');
+        expect(done.fare).toMatchObject({ total: expect.stringContaining('6.12'), estimate: '$5.33', lines: [{ label: 'Base fare', amount: expect.stringContaining('3.00') }] });
+
+        const calls = sent.length;
+        await tick();
+        expect(sent.length).toBe(calls);
+    });
+
+    test('says when no driver was found, and when the car stops reporting', async () => {
+        let status = order('started');
+        const { service } = await signedIn({
+            'GET service-quotes': () => [200, [{ id: 'quote_stored', service_rate: 'service_a', service_name: 'Economy', amount: 533, currency: 'USD' }]],
+            'POST customers/orders': () => [200, { id: 'order_ride', status: 'created' }],
+            'POST customers/orders/order_ride/dispatch': () => [200, {}],
+            'GET customers/orders/order_ride': () => status,
+            'GET customers/orders/order_ride/driver': () => [200, { driver: { name: 'Chen' }, vehicle: null }],
+            'GET customers/orders/order_ride/tracker': () => [200, { driver: { location: null, location_age_seconds: 300 } }],
+        });
+        const updates: any[] = [];
+        await service.requestRide({ pickup, dropoff, quote: economy, payment: 'card' }, (next) => updates.push(next));
+        await tick();
+        expect(updates[0]).toMatchObject({ status: 'driver_en_route', stale: true, driver: { name: 'Chen', rating: undefined, plate: '' } });
+        expect(updates[0].etaMinutes).toBeUndefined();
+
+        status = order('canceled', { meta: { dispatch_outcome: 'no_driver_found' } });
+        await tick();
+        expect(updates[updates.length - 1].status).toBe('no_driver');
+    });
+
+    test('a ride under way is picked up again after a restart, and finished ones are not', async () => {
+        const live = { id: 'order_ride', type: 'ride', dispatched: true, status: 'arrived', created_at: '2026-11-06T01:00:00Z', transaction_amount: 555, currency: 'USD', meta: { service_name: 'Economy', payment: 'card' }, payload: { pickup: place('Raffles', 103.85, 1.28), dropoff: place('Bugis', 103.84, 1.3) } };
+        let orders: unknown[] = [{ ...live, id: 'order_old', status: 'completed' }, { ...live, id: 'order_parcel', type: 'transport' }, live];
+        const { service, sent } = await signedIn({
+            'GET customers/orders': () => [200, orders],
+            'GET customers/orders/order_ride': () => order('arrived'),
+            'GET customers/orders/order_ride/driver': () => [200, { driver: { name: 'Chen' }, vehicle: null }],
+            'GET customers/orders/order_ride/tracker': () => [200, {}],
+        });
+        const onUpdate = jest.fn();
+        const ride = await service.activeRide(onUpdate);
+        expect(ride).toMatchObject({ id: 'order_ride', status: 'arrived', payment: 'card', quote: { className: 'Economy', fare: expect.stringContaining('5.55') }, pickup: { name: 'Raffles' } });
+        expect(decodeURIComponent(sent[sent.length - 1].url)).toContain('sort=-created_at');
+        await tick();
+        expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'arrived', driver: expect.objectContaining({ name: 'Chen' }) }));
+
+        orders = [{ ...live, status: 'canceled' }, { ...live, payload: { pickup: null, dropoff: null } }];
+        await expect(service.activeRide(onUpdate)).resolves.toBeUndefined();
+    });
+
+    test('a class that can no longer be priced is not booked', async () => {
+        const { service, sent } = await signedIn({ 'GET service-quotes': () => [200, []] });
+        await expect(service.requestRide({ pickup, dropoff, quote: economy, payment: 'cash' }, () => {})).rejects.toThrow('no longer available');
+        expect(sent.some((request) => request.url.endsWith('/customers/orders'))).toBe(false);
+    });
+
+    test('canceling stops following the ride and tells the server', async () => {
+        const { service, sent } = await signedIn({
+            'GET service-quotes': () => [200, [{ id: 'quote_stored', service_rate: 'service_a', service_name: 'Economy', amount: 533, currency: 'USD' }]],
+            'POST customers/orders': () => [200, { id: 'order_ride', status: 'created' }],
+            'POST customers/orders/order_ride/dispatch': () => [200, {}],
+            'POST customers/orders/order_ride/cancel': () => [200, { status: 'canceled' }],
+            'GET customers/orders/order_ride': () => order('dispatched'),
+        });
+        const onUpdate = jest.fn();
+        await service.requestRide({ pickup, dropoff, quote: economy, payment: 'cash' }, onUpdate);
+        await service.cancelRide('order_ride');
+        await tick();
+        expect(onUpdate).not.toHaveBeenCalled();
+        expect(sent[sent.length - 1].url).toContain('customers/orders/order_ride/cancel');
+    });
+
+    test('a failed refresh is tried again', async () => {
+        let fail = true;
+        const { service } = await signedIn({
+            'GET service-quotes': () => [200, [{ id: 'quote_stored', service_rate: 'service_a', service_name: 'Economy', amount: 533, currency: 'USD' }]],
+            'POST customers/orders': () => [200, { id: 'order_ride', status: 'created' }],
+            'POST customers/orders/order_ride/dispatch': () => [200, {}],
+            'GET customers/orders/order_ride': () => (fail ? [500, { error: 'Down' }] : order('dispatched')),
+        });
+        const onUpdate = jest.fn();
+        await service.requestRide({ pickup, dropoff, quote: economy, payment: 'cash' }, onUpdate);
+        await tick();
+        expect(onUpdate).not.toHaveBeenCalled();
+        fail = false;
+        await tick();
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('the chat with the driver', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    test('refreshes, shows a sent message straight away, and stops when closed', async () => {
+        let messages: unknown[] = [];
+        let fail = false;
+        const { service, sent } = await signedIn({
+            'GET customers/orders/order_ride/messages': () => (fail ? [500, {}] : [200, messages]),
+            'POST customers/orders/order_ride/messages': () => {
+                messages = [...messages, { id: 'm1', from: 'rider', text: 'Hi', sent_at: '2026-11-06T01:00:00Z' }];
+                return [201, messages[0]];
+            },
+        });
+        const seen: any[] = [];
+        const stop = service.watchMessages('order_ride', (list) => seen.push(list));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(seen).toEqual([[], []]);
+
+        await service.sendMessage('order_ride', 'Hi');
+        await jest.advanceTimersByTimeAsync(0);
+        expect(seen[seen.length - 1]).toEqual([{ id: 'm1', from: 'rider', text: 'Hi', sentAt: '2026-11-06T01:00:00Z' }]);
+        expect(sent.find((request) => request.method === 'POST' && request.url.endsWith('/messages'))!.body).toEqual({ text: 'Hi' });
+
+        fail = true;
+        const before = seen.length;
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(seen.length).toBe(before);
+
+        stop();
+        fail = false;
+        const calls = sent.length;
+        await jest.advanceTimersByTimeAsync(9000);
+        expect(sent.length).toBe(calls);
+    });
+});

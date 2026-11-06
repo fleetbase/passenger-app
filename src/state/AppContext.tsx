@@ -4,7 +4,7 @@ import { useColorScheme } from 'react-native';
 import { branding } from '../branding';
 import type { Appearance } from '../branding/schema';
 import { createService, sampleMode } from '../services';
-import type { PaymentMethod, Place, Profile, Quote, Ride, RideService } from '../services/types';
+import type { PaymentMethod, Place, Profile, Quote, Ride, RideService, RideSettings } from '../services/types';
 
 const service: RideService = createService();
 
@@ -31,6 +31,8 @@ type AppState = {
     requestRide: (args: { pickup: Place; quote: Quote; payment: PaymentMethod }) => Promise<void>;
     cancelRide: () => Promise<void>;
     clearRide: () => void;
+    /** Emergency and support contacts: the operator's settings, else the brand's. */
+    contacts: { emergencyNumber: string; supportPhone?: string; supportEmail?: string };
 };
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -42,6 +44,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [appearance, setAppearanceState] = useState<Appearance>(branding.appearance.defaultScheme);
     const [dropoff, setDropoff] = useState<Place>();
     const [ride, setRide] = useState<Ride>();
+    const [settings, setSettings] = useState<RideSettings>({});
+
+    const signedIn = Boolean(profile);
+    useEffect(() => {
+        if (signedIn) {
+            service.rideSettings().then(setSettings).catch(() => {});
+            // A ride under way when the app closed is picked up again.
+            service
+                .activeRide(setRide)
+                .then((active) => active && setRide((current) => current ?? active))
+                .catch(() => {});
+        }
+    }, [signedIn]);
+
+    const contacts = useMemo(
+        () => ({
+            emergencyNumber: settings.emergencyNumber ?? branding.emergencyNumber,
+            supportPhone: settings.supportPhone ?? branding.support?.phone,
+            supportEmail: settings.supportEmail ?? branding.support?.email,
+        }),
+        [settings]
+    );
 
     useEffect(() => {
         service.onSessionExpired(() => setProfile(undefined));
@@ -130,8 +154,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             requestRide,
             cancelRide,
             clearRide: () => setRide(undefined),
+            contacts,
         }),
-        [ready, profile, signIn, updateProfile, signOut, deleteAccount, appearance, setAppearance, scheme, dropoff, ride, requestRide, cancelRide]
+        [ready, profile, signIn, updateProfile, signOut, deleteAccount, appearance, setAppearance, scheme, dropoff, ride, requestRide, cancelRide, contacts]
     );
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

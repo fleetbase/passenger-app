@@ -14,9 +14,9 @@ export type PaymentMethod = 'cash' | 'card';
 export type Quote = {
     id: string;
     className: string;
-    /** Not known yet on Fleet-Ops (M4). */
+    /** Unknown when the operator has no car of this class. */
     seats?: number;
-    /** Not known yet on Fleet-Ops (M4). */
+    /** How soon the nearest free car of this class could arrive. Unknown when none is nearby. */
     pickupMinutes?: number;
     fare: string;
 };
@@ -24,7 +24,8 @@ export type Quote = {
 export type Driver = {
     name: string;
     initials: string;
-    rating: number;
+    /** Unknown until the driver has been rated. */
+    rating?: number;
     vehicle: string;
     plate: string;
 };
@@ -47,6 +48,8 @@ export type Ride = {
     route: Coordinate[];
     driver?: Driver;
     carPosition?: Coordinate;
+    /** The car hasn't reported its position for a while. */
+    stale?: boolean;
     etaMinutes?: number;
     fare?: FinalFare;
 };
@@ -102,6 +105,9 @@ export type Checkout = { uri: string } | { html: string };
 
 export type PaymentResult = 'paid' | 'failed';
 
+/** What the operator set for the rider app, over the values built into the brand. */
+export type RideSettings = { emergencyNumber?: string; supportPhone?: string; supportEmail?: string };
+
 /**
  * Everything the screens need from a backend. `fleetbase.ts` is the real implementation;
  * `stub.ts` is sample data for demos and tests.
@@ -117,6 +123,7 @@ export interface RideService {
     verifyCode(phone: string, code: string, name?: string): Promise<Profile | 'needs-name'>;
     updateProfile(profile: Profile): Promise<Profile>;
     deleteAccount(): Promise<void>;
+    rideSettings(): Promise<RideSettings>;
     currentPickup(): Promise<Place>;
     savedPlaces(): Promise<Place[]>;
     savePlace(draft: PlaceDraft): Promise<Place>;
@@ -124,6 +131,8 @@ export interface RideService {
     searchPlaces(query: string): Promise<Place[]>;
     quotes(pickup: Place, dropoff: Place): Promise<Quote[]>;
     requestRide(args: { pickup: Place; dropoff: Place; quote: Quote; payment: PaymentMethod }, onUpdate: (ride: Ride) => void): Promise<Ride>;
+    /** The rider's ride still under way, followed again after the app restarts. */
+    activeRide(onUpdate: (ride: Ride) => void): Promise<Ride | undefined>;
     cancelRide(rideId: string): Promise<void>;
     rateDriver(rideId: string, stars: number, comment?: string): Promise<void>;
     /** A link someone else can open to follow the trip live. */

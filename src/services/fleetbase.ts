@@ -1,9 +1,9 @@
 import Fleetbase from '@fleetbase/sdk';
 import { Platform } from 'react-native';
-import { NotConfiguredError, NotConnectedError } from './errors';
+import { NotConfiguredError } from './errors';
 import { currentPosition } from './location';
 import { clearSession, readSession, saveSession, type Session } from './session';
-import type { Coordinate, Place, Profile, Quote, RideService, Trip } from './types';
+import type { ChatMessage, Coordinate, Driver, FinalFare, Place, Profile, Quote, Ride, RideService, RideSettings, RideStatus, Trip } from './types';
 
 type CustomerResource = { name?: string; phone?: string; email?: string | null; token?: string };
 
@@ -16,21 +16,93 @@ type PlaceResource = {
     location?: { coordinates?: [number, number] } | null;
 };
 
-type QuoteResource = { service_rate: string; service_name: string; amount: number; currency: string };
+type QuoteResource = {
+    id?: string;
+    service_rate: string;
+    service_name: string;
+    amount: number;
+    currency: string;
+    meta?: { seats?: number | null; pickup_eta?: number | null };
+};
+
+type FareResource = { total: number; currency: string; lines?: { label: string; amount: number }[] };
 
 type OrderResource = {
     id: string;
+    type?: string;
+    dispatched?: boolean;
     status: string;
     created_at: string;
     distance?: number;
     time?: number;
     transaction_amount?: number | null;
     currency?: string | null;
-    meta?: { service_name?: string };
+    meta?: { service_name?: string; dispatch_outcome?: string; payment?: string; fare?: FareResource };
     payload?: { pickup?: PlaceResource | null; dropoff?: PlaceResource | null; payment_method?: string | null } | null;
 };
 
+type DriverResource = {
+    driver: { name: string; rating?: number | null } | null;
+    vehicle: { make?: string | null; model?: string | null; color?: string | null; plate_number?: string | null } | null;
+};
+
+type TrackerResource = {
+    driver?: { location?: { coordinates?: [number, number] } | null; location_age_seconds?: number | null } | null;
+    route?: { legs?: { duration_s?: number | null }[] } | null;
+    eta?: { completion_seconds?: number | null } | null;
+};
+
+type MessageResource = { id: string; from: 'rider' | 'driver'; text: string; sent_at: string };
+
+type InvoiceResource = { invoice: { id: string; status: string; payment_url?: string } | null };
+
 type Adapter = ReturnType<Fleetbase['getAdapter']>;
+
+/** Invoice statuses after which nothing is left to pay. */
+const PAID = ['paid'];
+
+/** How often a ride in progress is refreshed. */
+const POLL_MS = 3000;
+
+/** A car position older than this is shown as out of date. */
+const STALE_SECONDS = 60;
+
+const RIDE_STATUS: Record<string, RideStatus> = {
+    created: 'searching',
+    dispatched: 'searching',
+    started: 'driver_en_route',
+    arrived: 'arrived',
+    in_progress: 'in_progress',
+    completed: 'completed',
+    canceled: 'canceled',
+    no_show: 'canceled',
+};
+
+const rideStatus = (order: OrderResource): RideStatus =>
+    order.status === 'canceled' && order.meta?.dispatch_outcome === 'no_driver_found' ? 'no_driver' : (RIDE_STATUS[order.status] ?? 'searching');
+
+const isLive = (status: RideStatus) => status === 'driver_en_route' || status === 'arrived' || status === 'in_progress';
+
+const isOver = (status: RideStatus) => status === 'completed' || status === 'canceled' || status === 'no_driver';
+
+const minutes = (seconds?: number | null) => (typeof seconds === 'number' ? Math.max(1, Math.round(seconds / 60)) : undefined);
+
+const toDriver = ({ driver, vehicle }: DriverResource): Driver | undefined => {
+    if (!driver) {
+        return undefined;
+    }
+    const initials = driver.name
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+    const car = [vehicle?.color, vehicle?.make, vehicle?.model].filter(Boolean).join(' ');
+    return { name: driver.name, initials, rating: driver.rating ?? undefined, vehicle: car, plate: vehicle?.plate_number ?? '' };
+};
+
+/** The rider's place as the API takes it. Coordinates rather than an id, so only what the rider chose is sent. */
+const placeInput = ({ name, detail, location }: Place) => ({ name, street1: detail || name, ...location });
 
 const CURRENT_LOCATION = 'current-location';
 const PICKUP_LIFETIME_MS = 30000;
@@ -73,6 +145,15 @@ const toSummary = (order: OrderResource) => {
     return `${(order.distance / 1000).toFixed(1)} km · ${Math.round(order.time / 60)} min`;
 };
 
+/** The final fare, from the breakdown the server stores when the trip ends, or the fare agreed at booking. */
+const toFare = (order: OrderResource, estimate: string): FinalFare | undefined => {
+    const fare = order.meta?.fare;
+    if (fare) {
+        return { total: formatMoney(fare.total, fare.currency), estimate, lines: (fare.lines ?? []).map((line) => ({ label: line.label, amount: formatMoney(line.amount, fare.currency) })) };
+    }
+    return order.transaction_amount && order.currency ? { total: formatMoney(order.transaction_amount, order.currency), estimate, lines: [] } : undefined;
+};
+
 const toTrip = (order: OrderResource): Trip | undefined => {
     const pickup = toPlace(order.payload?.pickup);
     const dropoff = toPlace(order.payload?.dropoff);
@@ -89,7 +170,7 @@ const toTrip = (order: OrderResource): Trip | undefined => {
         dropoff,
         route: [pickup.location, dropoff.location],
         payment: method === 'cash' || method === 'card' ? method : undefined,
-        fare: order.transaction_amount && order.currency ? { total: formatMoney(order.transaction_amount, order.currency), estimate: '', lines: [] } : undefined,
+        fare: toFare(order, ''),
         summary: toSummary(order),
     };
 };
@@ -113,14 +194,28 @@ const reachableHost = (host: string) => {
 export function createFleetbaseService({ host, key }: { host: string; key: string }): RideService {
     let session: Session | undefined;
     let pickup: { at: number; place: Promise<Place> } | undefined;
+    let stopWatching = () => {};
     let onExpired = () => {};
 
-    const adapter = (): Adapter => {
+    const adapter = (namespace?: string): Adapter => {
         if (!host || !key) {
             throw new NotConfiguredError();
         }
-        return new Fleetbase(key, { host: reachableHost(host) }).getAdapter();
+        return new Fleetbase(key, { host: reachableHost(host), ...(namespace ? { namespace } : {}) }).getAdapter();
     };
+
+    /** The rider's invoice for a ride, from Ledger. Null until the final fare is billed. */
+    const invoiceFor = async (rideId: string) => {
+        const token = session?.token;
+        if (!token) {
+            throw new Error('No rider is signed in.');
+        }
+        const { invoice } = (await adapter('ledger/v1').get(`customers/orders/${rideId}/invoice`, {}, { headers: { 'Customer-Token': token } })) as InvoiceResource;
+        return invoice;
+    };
+
+    /** Message watchers per ride, so a sent message shows straight away. */
+    const chatRefreshers = new Map<string, Set<() => void>>();
 
     const startSession = (customer: CustomerResource, phone: string) => {
         if (!customer.token) {
@@ -133,6 +228,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
     };
 
     const endSession = () => {
+        stopWatching();
         session = undefined;
         pickup = undefined;
         clearSession().catch(() => {});
@@ -154,8 +250,6 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             throw cause;
         }
     };
-
-    const notConnected = (method: string) => () => Promise.reject(new NotConnectedError(method));
 
     const savedPlaces = async () => {
         const places = await asRider<PlaceResource[]>((api, options) => api.get('customers/places', {}, options));
@@ -182,6 +276,54 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             });
         }
         return pickup.place;
+    };
+
+    /** Refreshes a ride until it ends: its status, then once a driver accepts, who they are and where the car is. */
+    const watchRide = (ride: Ride, onUpdate: (ride: Ride) => void) => {
+        stopWatching();
+        let current = ride;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let stopped = false;
+        stopWatching = () => {
+            stopped = true;
+            clearTimeout(timer);
+        };
+
+        const tick = async () => {
+            try {
+                const order = await asRider<OrderResource>((api, options) => api.get(`customers/orders/${ride.id}`, {}, options));
+                const next: Ride = { ...current, status: rideStatus(order) };
+                if (isLive(next.status)) {
+                    if (!next.driver) {
+                        next.driver = toDriver(await asRider<DriverResource>((api, options) => api.get(`customers/orders/${ride.id}/driver`, {}, options)));
+                    }
+                    const tracker = await asRider<TrackerResource>((api, options) => api.get(`customers/orders/${ride.id}/tracker`, {}, options)).catch(() => undefined);
+                    const coordinates = tracker?.driver?.location?.coordinates;
+                    if (coordinates) {
+                        next.carPosition = { latitude: coordinates[1], longitude: coordinates[0] };
+                    }
+                    next.stale = (tracker?.driver?.location_age_seconds ?? 0) > STALE_SECONDS;
+                    next.etaMinutes = minutes(next.status === 'in_progress' ? tracker?.eta?.completion_seconds : tracker?.route?.legs?.[0]?.duration_s) ?? next.etaMinutes;
+                }
+                if (next.status === 'completed') {
+                    next.fare = toFare(order, ride.quote.fare);
+                }
+                current = next;
+                if (!stopped) {
+                    onUpdate(next);
+                }
+                if (isOver(next.status)) {
+                    stopWatching();
+                }
+            } catch {
+                // A missed refresh is retried on the next tick.
+            }
+            if (!stopped) {
+                timer = setTimeout(tick, POLL_MS);
+            }
+        };
+
+        timer = setTimeout(tick, POLL_MS);
     };
 
     return {
@@ -232,7 +374,14 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             }
             return next;
         },
-        deleteAccount: notConnected('deleteAccount'),
+        async deleteAccount() {
+            await asRider((api, options) => api.delete('customers/me', {}, options));
+            endSession();
+        },
+        async rideSettings(): Promise<RideSettings> {
+            const settings = await asRider<{ emergency_number?: string | null; support?: { phone?: string | null; email?: string | null } }>((api, options) => api.get('customers/ride-settings', {}, options));
+            return { emergencyNumber: settings.emergency_number ?? undefined, supportPhone: settings.support?.phone ?? undefined, supportEmail: settings.support?.email ?? undefined };
+        },
         currentPickup,
         savedPlaces,
         async savePlace({ id, name, address }) {
@@ -260,19 +409,107 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             return [...found.filter(matches), ...found.filter((place) => !matches(place))];
         },
         async quotes(from, to) {
-            const quotes = (await adapter().get('service-quotes', { pickup: placeParam(from), dropoff: placeParam(to), preview: 1 })) as QuoteResource[];
-            return quotes.map((quote): Quote => ({ id: quote.service_rate, className: quote.service_name, fare: formatMoney(quote.amount, quote.currency) }));
+            const quotes = (await adapter().get('service-quotes', { pickup: placeParam(from), dropoff: placeParam(to), preview: 1, availability: 1 })) as QuoteResource[];
+            return quotes.map(
+                (quote): Quote => ({
+                    id: quote.service_rate,
+                    className: quote.service_name,
+                    fare: formatMoney(quote.amount, quote.currency),
+                    seats: quote.meta?.seats ?? undefined,
+                    pickupMinutes: minutes(quote.meta?.pickup_eta),
+                })
+            );
         },
-        requestRide: notConnected('requestRide'),
-        cancelRide: notConnected('cancelRide'),
-        rateDriver: notConnected('rateDriver'),
-        shareLink: notConnected('shareLink'),
-        watchMessages() {
-            return () => {};
+        async requestRide({ pickup: from, dropoff: to, quote, payment }, onUpdate) {
+            // Previews can't be booked, so the chosen class is priced again as a fare the order can hold.
+            const [stored] = (await adapter().get('service-quotes', { pickup: placeParam(from), dropoff: placeParam(to), service: quote.id })) as QuoteResource[];
+            if (!stored?.id) {
+                throw new Error('That option is no longer available. Choose another.');
+            }
+            const order = await asRider<OrderResource>((api, options) =>
+                api.post('customers/orders', { type: 'ride', service_quote: stored.id, pickup: placeInput(from), dropoff: placeInput(to), meta: { payment } }, options)
+            );
+            await asRider((api, options) => api.post(`customers/orders/${order.id}/dispatch`, {}, options));
+            const ride: Ride = { id: order.id, status: 'searching', pickup: from, dropoff: to, quote, payment, route: [from.location, to.location] };
+            watchRide(ride, onUpdate);
+            return ride;
         },
-        sendMessage: notConnected('sendMessage'),
-        createCheckout: notConnected('createCheckout'),
-        confirmPayment: notConnected('confirmPayment'),
+        async activeRide(onUpdate) {
+            const orders = await asRider<OrderResource[]>((api, options) => api.get('customers/orders', { limit: 10, sort: '-created_at' }, options));
+            const order = orders.find((candidate) => candidate.type === 'ride' && candidate.dispatched && !isOver(rideStatus(candidate)));
+            const pickup = toPlace(order?.payload?.pickup);
+            const dropoff = toPlace(order?.payload?.dropoff);
+            if (!order || !pickup || !dropoff) {
+                return undefined;
+            }
+            const method = order.meta?.payment;
+            const ride: Ride = {
+                id: order.id,
+                status: rideStatus(order),
+                pickup,
+                dropoff,
+                quote: { id: '', className: order.meta?.service_name ?? '', fare: order.transaction_amount && order.currency ? formatMoney(order.transaction_amount, order.currency) : '' },
+                payment: method === 'card' ? 'card' : 'cash',
+                route: [pickup.location, dropoff.location],
+            };
+            watchRide(ride, onUpdate);
+            return ride;
+        },
+        async cancelRide(rideId) {
+            stopWatching();
+            await asRider((api, options) => api.post(`customers/orders/${rideId}/cancel`, {}, options));
+        },
+        async rateDriver(rideId, stars, comment) {
+            await asRider((api, options) => api.post(`customers/orders/${rideId}/rating`, { stars, comment: comment?.trim() || undefined }, options));
+        },
+        async shareLink(rideId) {
+            const { url } = await asRider<{ url: string }>((api, options) => api.post(`customers/orders/${rideId}/share`, {}, options));
+            return url;
+        },
+        watchMessages(rideId, onChange) {
+            let stopped = false;
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const refresh = async () => {
+                clearTimeout(timer);
+                try {
+                    const messages = await asRider<MessageResource[]>((api, options) => api.get(`customers/orders/${rideId}/messages`, {}, options));
+                    if (!stopped) {
+                        onChange(messages.map((message): ChatMessage => ({ id: message.id, from: message.from, text: message.text, sentAt: message.sent_at })));
+                    }
+                } catch {
+                    // Tried again on the next refresh.
+                }
+                if (!stopped) {
+                    timer = setTimeout(refresh, POLL_MS);
+                }
+            };
+            const refreshers = chatRefreshers.get(rideId) ?? new Set();
+            chatRefreshers.set(rideId, refreshers);
+            refreshers.add(refresh);
+            onChange([]);
+            refresh();
+            return () => {
+                stopped = true;
+                clearTimeout(timer);
+                refreshers.delete(refresh);
+            };
+        },
+        async sendMessage(rideId, text) {
+            await asRider((api, options) => api.post(`customers/orders/${rideId}/messages`, { text }, options));
+            chatRefreshers.get(rideId)?.forEach((refresh) => refresh());
+        },
+        async createCheckout(rideId) {
+            const invoice = await invoiceFor(rideId);
+            if (!invoice?.payment_url) {
+                throw new Error("Your fare isn't ready to pay yet. Try again in a moment.");
+            }
+            return { uri: invoice.payment_url };
+        },
+        async confirmPayment(rideId) {
+            // Whatever the page said, only the invoice says whether the trip is paid.
+            const invoice = await invoiceFor(rideId);
+            return invoice && PAID.includes(invoice.status) ? 'paid' : 'failed';
+        },
         async trips() {
             const orders = await asRider<OrderResource[]>((api, options) => api.get('customers/orders', { limit: 50 }, options));
             return orders.flatMap((order) => toTrip(order) ?? []).sort((a, b) => b.date.localeCompare(a.date));

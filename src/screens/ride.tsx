@@ -18,14 +18,14 @@ const DriverCard = componentSlot('ride.driverCard', ({ driver, compact }: Compon
         <Avatar initials={driver.initials} size={compact ? 52 : 60} />
         <YStack flex={1}>
             <T variant='action'>{driver.name}</T>
-            <T variant='secondary' tone='$sub'>★ {driver.rating} · {compact ? driver.plate : driver.vehicle}</T>
+            <T variant='secondary' tone='$sub'>{driver.rating ? `★ ${driver.rating.toFixed(1)}` : 'New driver'} · {compact ? driver.plate : driver.vehicle}</T>
         </YStack>
     </XStack>
 ));
 
 /** R13, R14, R16, R17, R18 and R18s. One screen, because the map stays put as the status changes. */
 export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ride'>) {
-    const { service, ride, cancelRide } = useApp();
+    const { service, ride, cancelRide, clearRide, contacts } = useApp();
     const [safety, setSafety] = useState(false);
     const [shareNote, setShareNote] = useState<{ text: string; tone: 'ok' | 'danger' }>();
 
@@ -41,6 +41,12 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
 
     const cancel = async () => {
         await cancelRide();
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    };
+
+    // The ride has already ended, so there is nothing to cancel.
+    const leave = () => {
+        clearRide();
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     };
 
@@ -73,7 +79,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
             {status === 'driver_en_route' ? (
                 <TopStack>
                     <Card paddingVertical={14} gap={2}>
-                        <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>Arriving in {ride.etaMinutes} min</T>
+                        <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{ride.etaMinutes ? `Arriving in ${ride.etaMinutes} min` : 'Your driver is on the way'}</T>
                         <T variant='secondary' tone='$sub'>Pickup at {ride.pickup.name}</T>
                     </Card>
                 </TopStack>
@@ -89,22 +95,23 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
             {onTrip ? (
                 <TopStack>
                     <Card paddingVertical={14} gap={2}>
-                        <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{ride.etaMinutes} min to go</T>
+                        <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{ride.etaMinutes ? `${ride.etaMinutes} min to go` : 'On your way'}</T>
                         <T variant='secondary' tone='$sub'>Heading to {ride.dropoff.name}</T>
                     </Card>
                 </TopStack>
             ) : null}
 
             <BottomStack>
+                {hasDriver && ride.stale ? <Banner text="The car's position hasn't updated for a minute. It may be out of date." tone='warn' /> : null}
                 {shareNote ? <Banner text={shareNote.text} tone={shareNote.tone} /> : null}
                 {safety ? (
                     <Card>
                         <T variant='title'>Your safety</T>
                         <T tone='$sub'>Your trip is being tracked. If you're in danger, call emergency services.</T>
                         <YStack>
-                            <Row title='Call emergency services' subtitle={brand.emergencyNumber} icon='phone' onPress={() => Linking.openURL(`tel:${brand.emergencyNumber}`)} />
-                            <Row title='Share trip' subtitle='Send a live link to someone you trust' icon='share' onPress={shareTrip} last={!brand.support?.phone} />
-                            {brand.support?.phone ? <Row title={`Contact ${brand.name}`} subtitle='Get help with this trip' icon='help' onPress={() => Linking.openURL(`tel:${brand.support?.phone}`)} last /> : null}
+                            <Row title='Call emergency services' subtitle={contacts.emergencyNumber} icon='phone' onPress={() => Linking.openURL(`tel:${contacts.emergencyNumber}`)} />
+                            <Row title='Share trip' subtitle='Send a live link to someone you trust' icon='share' onPress={shareTrip} last={!contacts.supportPhone} />
+                            {contacts.supportPhone ? <Row title={`Contact ${brand.name}`} subtitle='Get help with this trip' icon='help' onPress={() => Linking.openURL(`tel:${contacts.supportPhone}`)} last /> : null}
                         </YStack>
                         <Button label='Close' kind='second' onPress={() => setSafety(false)} />
                     </Card>
@@ -122,7 +129,15 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
                         <>
                             <T variant='title'>No drivers free right now</T>
                             <T tone='$sub'>You haven't been charged. Try again, or choose another class.</T>
-                            <Button label='Choose another class' onPress={cancel} />
+                            <Button label='Choose another class' onPress={leave} />
+                        </>
+                    ) : null}
+
+                    {status === 'canceled' ? (
+                        <>
+                            <T variant='title'>Your ride was canceled</T>
+                            <T tone='$sub'>The driver or {brand.name} canceled this ride. You haven't been charged. You can book again.</T>
+                            <Button label='Back to home' onPress={leave} />
                         </>
                     ) : null}
 
@@ -195,6 +210,7 @@ export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay
                 <YStack flex={1} borderRadius={20} overflow='hidden' borderWidth={1} borderColor='$line'>
                     {checkout ? <HostedCheckout checkout={checkout} onResult={finishCheckout} /> : null}
                 </YStack>
+                <Button label="I've paid" kind='second' onPress={() => finishCheckout('paid')} />
                 <Button label='Close without paying' kind='ghost' onPress={() => setStage('failed')} />
             </Screen>
         );
