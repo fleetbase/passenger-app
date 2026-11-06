@@ -6,7 +6,7 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 
 **Early development: the whole ride runs on Fleet-Ops, but it hasn't been tried on a phone yet.** Sign-in, booking, timed offers to drivers, the live car and ETA, chat with the driver, sharing a trip, the final fare from the actual trip, card or cash payment through Ledger, ratings and account deletion use the real API. Proven on the web build against a local Fleetbase only. Push notifications need a push library and each operator's Firebase project, which the app doesn't have yet. The plan is in `ride-hailing/FLEETOPS-INTEGRATION-PLAN.md` in the Fleetbase workspace. Don't use this for real rides.
 
-The server needs a ride order config (`php artisan fleetops:create-ride-config {company}`), service rates whose `service_type` matches the vehicles' `type`, and Ledger with a payment gateway. For cash, turn on the cash gateway's `staff_confirm_only`, or riders can mark their own trip paid.
+The server needs a ride order config (`php artisan fleetops:create-ride-config {company}`), which makes riders' orders adhoc, matched by vehicle type and offered to one driver at a time. It also needs service rates whose `service_type` matches the vehicles' `type`, and Ledger with a payment gateway. For cash, turn on the cash gateway's `staff_confirm_only`, or riders can mark their own trip paid.
 
 To try the full journey without a server, set `PASSENGER_SAMPLE_DATA=true` in `.env`. It uses a simulated driver, and a banner stays on screen. On sample data, trips and saved places reset when the app restarts, and the card checkout, trip link and driver replies aren't real. No card is charged.
 
