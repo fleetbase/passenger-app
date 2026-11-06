@@ -1,0 +1,30 @@
+name: Release Tag
+
+# Tags a release when a release/v* branch is merged to main. The reusable Fleetbase
+# workflow checks that the branch version, package.json and RELEASE.md agree, then
+# pushes the tag, which create-release.yml turns into a GitHub Release. Store
+# publishing goes through AppHelm, not this repository.
+
+on:
+    pull_request:
+        types: [closed]
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: 'Version to tag, e.g. 0.1.0. Recovery only — a normal release reads it from the branch.'
+                required: true
+
+permissions:
+    contents: read
+
+jobs:
+    tag:
+        if: github.event_name == 'workflow_dispatch' ||
+            (github.event.pull_request.merged == true &&
+            startsWith(github.event.pull_request.head.ref, 'release/v'))
+        uses: fleetbase/fleetbase/.github/workflows/release-tag.yml@main
+        with:
+            version-files: package.json
+            version: ${{ github.event.inputs.version || '' }}
+        secrets: inherit
