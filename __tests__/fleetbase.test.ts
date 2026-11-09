@@ -107,8 +107,8 @@ test('quotes use the rate as id, format the smallest unit, and show seats and pi
         'GET service-quotes': () => [
             200,
             [
-                { service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD', seats: null, pickup_eta: null },
-                { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY', seats: 6, pickup_eta: 200 },
+                { service_rate: 'service_a', service_name: 'Economy', amount: 2575, currency: 'USD', seating_capacity: null, pickup_eta: null },
+                { service_rate: 'service_b', service_name: 'XL', amount: 3400, currency: 'JPY', seating_capacity: 6, pickup_eta: 200 },
             ],
         ],
     });
@@ -127,13 +127,15 @@ test('quotes use the rate as id, format the smallest unit, and show seats and pi
 });
 
 test('history shows finished trips only, newest first, without claiming how they were paid', async () => {
-    const order = (id: string, status: string, created_at: string, extra = {}) => ({ id, status, created_at, payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36) }, ...extra });
+    const order = (id: string, status: string, created_at: string, extra = {}) => ({ id, type: 'passenger', status, created_at, payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36) }, ...extra });
     const { service } = await signedIn({
         'GET customers/orders': () => [200, [
-            order('order_old', 'completed', '2026-11-01T00:00:00Z', { fare: { final: true, total: 2340, currency: 'USD', estimate: 2100, distance: 21000, time: 1500, service: 'Economy', lines: [] } }),
-            order('order_paid', 'completed', '2026-10-30T00:00:00Z', { paid_at: '2026-10-30T01:00:00Z', payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36), payment_method: 'card' } }),
+            order('order_old', 'completed', '2026-11-01T00:00:00Z', { distance: 21000, time: 1500, purchase_rate: { service_quote: 'quote_old', service_name: 'Economy', amount: 2340, currency: 'USD', repriced: true } }),
+            order('order_paid', 'completed', '2026-10-30T00:00:00Z', { payment_status: 'paid', payload: { pickup: place('Home', 103.84, 1.27), dropoff: place('Airport', 103.99, 1.36), payment_method: 'card' } }),
             order('order_active', 'created', '2026-11-04T00:00:00Z'),
             order('order_new', 'canceled', '2026-11-03T00:00:00Z'),
+            // Another kind of order the same customer placed with the operator.
+            { ...order('order_parcel', 'completed', '2026-11-05T00:00:00Z'), type: 'transport' },
         ]],
     });
     const trips = await service.trips();
@@ -141,7 +143,6 @@ test('history shows finished trips only, newest first, without claiming how they
     expect(trips[2]).toMatchObject({ payment: 'card', paid: true });
     expect(trips[1]).toMatchObject({ summary: '21.0 km · 25 min', className: 'Economy' });
     expect(trips[1].fare?.total).toContain('23.40');
-    expect(trips[1].fare?.estimate).toContain('21.00');
     expect(trips[1].payment).toBeUndefined();
     expect(trips[1].paid).toBeUndefined();
     expect(trips[0].fare).toBeUndefined();
@@ -178,9 +179,13 @@ test('deleting the account ends the session', async () => {
 });
 
 test('the operator settings override the brand, and stay unset when missing', async () => {
-    const { service, sent } = await signedIn({ 'GET customers/ride-settings': () => [200, { emergency_number: '995', support: { phone: null, email: 'help@cabs.test' } }] });
-    await expect(service.rideSettings()).resolves.toEqual({ emergencyNumber: '995', supportPhone: undefined, supportEmail: 'help@cabs.test' });
-    expect(sent[sent.length - 1].headers.get('Customer-Token')).toBe('rider-token');
+    const { service, sent } = await signedIn({ 'GET organizations/current': () => [200, { name: 'City Cabs', phone: '+6560001234' }] });
+    await expect(service.rideSettings()).resolves.toEqual({ supportPhone: '+6560001234' });
+    // The organization is read with the API key alone.
+    expect(sent[sent.length - 1].headers.get('Customer-Token')).toBeNull();
+
+    const missing = await signedIn({ 'GET organizations/current': () => [200, { name: 'City Cabs', phone: null }] });
+    await expect(missing.service.rideSettings()).resolves.toEqual({ supportPhone: undefined });
 });
 
 test('a rating and a share link go to the ride', async () => {
@@ -278,6 +283,8 @@ describe('a ride', () => {
             'GET customers/orders/order_ride': () => status,
             'GET customers/orders/order_ride/driver': () => [200, { driver: { name: 'Chen Test', rating: 4.86 }, vehicle: { make: 'Honda', model: 'Jazz', color: 'Silver', plate_number: 'KTX 5512' } }],
             'GET customers/orders/order_ride/tracker': () => [200, { driver: { location: { coordinates: [103.8511, 1.287] }, location_age_seconds: 4 }, route: { legs: [{ duration_s: 130 }] }, eta: { completion_seconds: 420 } }],
+            // The quote the order was priced again at, with its lines.
+            'GET service-quotes/quote_final': () => [200, { id: 'quote_final', service_name: 'Economy', amount: 612, currency: 'USD', items: [{ details: 'Base', amount: 300 }, { details: 'Distance and time', amount: 312 }] }],
         });
         const updates: any[] = [];
         const ride = await service.requestRide({ pickup, dropoff, quote: economy, payment: 'cash' }, (next) => updates.push(next));
@@ -288,7 +295,7 @@ describe('a ride', () => {
         expect(stored.url).not.toContain('preview');
         const created = sent.find((request) => request.method === 'POST' && request.url.endsWith('/customers/orders'))!;
         expect(created.body).toEqual({
-            type: 'ride',
+            type: 'passenger',
             service_quote: 'quote_stored',
             pickup: { name: '1 Raffles Place', street1: 'Downtown', latitude: 1.2841, longitude: 103.8511 },
             dropoff: { name: 'Bugis', street1: 'Bugis', latitude: 1.3005, longitude: 103.8452 },
@@ -313,11 +320,18 @@ describe('a ride', () => {
         expect(updates[updates.length - 1]).toMatchObject({ status: 'in_progress', etaMinutes: 7 });
         expect(sent.filter((request) => request.url.includes('/driver')).length).toBe(1);
 
-        status = order('completed', { fare: { final: true, total: 612, currency: 'USD', estimate: null, lines: [{ label: 'Base fare', amount: 300 }] } });
+        status = order('completed', { purchase_rate: { service_quote: 'quote_final', amount: 612, currency: 'USD', repriced: true } });
         await tick();
         const done = updates[updates.length - 1];
         expect(done.status).toBe('completed');
-        expect(done.fare).toMatchObject({ total: expect.stringContaining('6.12'), estimate: '$5.33', lines: [{ label: 'Base fare', amount: expect.stringContaining('3.00') }] });
+        expect(done.fare).toMatchObject({
+            total: expect.stringContaining('6.12'),
+            estimate: '$5.33',
+            lines: [
+                { label: 'Base', amount: expect.stringContaining('3.00') },
+                { label: 'Distance and time', amount: expect.stringContaining('3.12') },
+            ],
+        });
 
         const calls = sent.length;
         await tick();
@@ -346,7 +360,7 @@ describe('a ride', () => {
     });
 
     test('a ride under way is picked up again after a restart, and finished ones are not', async () => {
-        const live = { id: 'order_ride', type: 'ride', dispatched: true, status: 'arrived', created_at: '2026-11-06T01:00:00Z', fare: { final: false, total: 555, currency: 'USD', service: 'Economy' }, payload: { pickup: place('Raffles', 103.85, 1.28), dropoff: place('Bugis', 103.84, 1.3), payment_method: 'card' } };
+        const live = { id: 'order_ride', type: 'passenger', dispatched: true, status: 'arrived', created_at: '2026-11-06T01:00:00Z', purchase_rate: { service_quote: 'quote_live', service_name: 'Economy', amount: 555, currency: 'USD' }, payload: { pickup: place('Raffles', 103.85, 1.28), dropoff: place('Bugis', 103.84, 1.3), payment_method: 'card' } };
         let orders: unknown[] = [{ ...live, id: 'order_old', status: 'completed' }, { ...live, id: 'order_parcel', type: 'transport' }, live];
         const { service, sent } = await signedIn({
             'GET customers/orders': () => [200, orders],
@@ -415,7 +429,7 @@ describe('the chat with the driver', () => {
         const { service, sent } = await signedIn({
             'GET customers/orders/order_ride/messages': () => (fail ? [500, {}] : [200, messages]),
             'POST customers/orders/order_ride/messages': () => {
-                messages = [...messages, { id: 'm1', from: 'rider', text: 'Hi', sent_at: '2026-11-06T01:00:00Z' }];
+                messages = [...messages, { id: 'm1', from: 'customer', text: 'Hi', sent_at: '2026-11-06T01:00:00Z' }];
                 return [201, messages[0]];
             },
         });

@@ -48,15 +48,23 @@ It runs on iOS, Android and the web, from one React Native codebase.
 
 ## What the server needs
 
-- **Fleetbase with Fleet-Ops** from the `release/v0.7.0` line. The rider routes, timed offers and ride fields come from [fleetbase/fleetops#424](https://github.com/fleetbase/fleetops/pull/424), which isn't merged yet.
+- **Fleetbase with Fleet-Ops v0.7.0 or later** ([fleetbase/fleetops#426](https://github.com/fleetbase/fleetops/pull/426) until it's released). The app uses Fleet-Ops' generic customer API. Everything ride-specific comes from an order config: its flow, policies, triggers and custom fields.
 - **A Fleetbase API key** for the operator's company, from Developers → API Keys in the Console. The key is built into the app, so anyone who has the app can read it. Fleetbase can't yet limit what a key reaches; that will come with permissions and roles for API keys in IAM. Until then, don't publish a build to the public.
-- **A ride order config** for the operator's company:
+- **An order config made from Fleet-Ops' `passenger` template**, for the operator's company:
 
   ```bash
-  php artisan fleetops:create-ride-config {company} --emergency-number=112 --support-phone="+1 555 0100" --support-email=help@example.com
+  php artisan fleetops:create-order-config passenger --company={company}
   ```
 
-  It makes riders' orders adhoc, matches them by vehicle type, offers them to one driver at a time for 20 seconds, and sets up the ride steps (en route, arrived, in trip, completed, no-show).
+  You can also make it in the Console: **Fleet-Ops → Operations → Order Configs → New Order Config**, starting from **Passenger**. The template sets up the trip's steps: on the way, arrived, in trip, completed and no-show. Its policies cover the rest:
+  - customers' orders are adhoc, offered to one driver at a time for 20 seconds, and matched by the vehicle type of the service they chose;
+  - card trips must be paid before the next booking;
+  - customers can cancel until the trip starts;
+  - chat, rating and sharing are on;
+  - the price is worked out again from the actual trip.
+
+  Its triggers send the customer a push at each step and when the driver is about 400 m away. Change any of it in the Console's **Policies** and **Triggers** tabs. If the config's key isn't `passenger`, set `FLEETBASE_ORDER_CONFIG`.
+- **The operator's phone number** on their organization. The app shows it as the support number. The emergency number and a support email come from the brand config.
 - **Service rates** whose `service_type` matches the vehicles' `type`. Each one becomes a car class.
 - **Ledger with a payment gateway** for card payments. For cash, turn on the cash gateway's `staff_confirm_only`, or riders can mark their own trip paid.
 - **Drivers on Navigator,** online and with a vehicle.
@@ -124,6 +132,7 @@ Settings are read from `.env` (or the environment) when the app is built, by `sc
 |---|---|
 | `FLEETBASE_HOST` | Your Fleetbase API, for example `http://localhost:8000`. Android emulators reach this machine at `10.0.2.2`, and the app handles that. |
 | `FLEETBASE_API_KEY` | The operator's Fleetbase API key, from Developers → API Keys in the Console. |
+| `FLEETBASE_ORDER_CONFIG` | The key of the Fleet-Ops order config the app books. Defaults to `passenger`. |
 | `PASSENGER_SAMPLE_DATA` | `true` runs on built-in sample data with no server. |
 
 ## Sample data

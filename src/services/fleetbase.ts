@@ -22,20 +22,13 @@ type QuoteResource = {
     service_name: string;
     amount: number;
     currency: string;
-    seats?: number | null;
+    seating_capacity?: number | null;
     pickup_eta?: number | null;
+    items?: { details?: string | null; code?: string | null; amount: number }[];
 };
 
-type FareResource = {
-    final: boolean;
-    total: number;
-    currency: string;
-    estimate?: number | null;
-    distance?: number | null;
-    time?: number | null;
-    service?: string | null;
-    lines?: { label: string; amount: number }[];
-};
+/** The price an order was bought at: its purchase rate names the service quote, with its lines. */
+type PurchaseRateResource = { service_quote?: string | null; service_name?: string | null; amount?: number | null; currency?: string | null; repriced?: boolean };
 
 type OrderResource = {
     id: string;
@@ -47,10 +40,10 @@ type OrderResource = {
     time?: number;
     transaction_amount?: number | null;
     currency?: string | null;
-    fare?: FareResource | null;
-    payment_method?: string | null;
+    purchase_rate?: PurchaseRateResource | null;
+    /** The order's transaction settlement status, `paid` once paid. */
+    payment_status?: string | null;
     dispatch_outcome?: string | null;
-    paid_at?: string | null;
     payload?: { pickup?: PlaceResource | null; dropoff?: PlaceResource | null; payment_method?: string | null } | null;
 };
 
@@ -65,7 +58,9 @@ type TrackerResource = {
     eta?: { completion_seconds?: number | null } | null;
 };
 
-type MessageResource = { id: string; from: 'rider' | 'driver'; text: string; sent_at: string };
+type MessageResource = { id: string; from: 'customer' | 'driver'; text: string; sent_at: string };
+
+type OrganizationResource = { name?: string; phone?: string | null; website_url?: string | null };
 
 type InvoiceResource = { invoice: { id: string; status: string; payment_url?: string } | null };
 
@@ -151,29 +146,30 @@ const formatMoney = (amount: number, currency: string) => {
     return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
 };
 
-/** The distance and time the trip was priced on. */
+/** The distance and time the trip took. */
 const toSummary = (order: OrderResource) => {
-    const { distance, time } = order.fare ?? {};
+    const { distance, time } = order;
     if (!distance || !time) {
         return undefined;
     }
     return `${(distance / 1000).toFixed(1)} km · ${Math.round(time / 60)} min`;
 };
 
-/** The fare the order was bought at, with its lines, and the price first booked as the estimate. */
-const toFare = (order: OrderResource, estimate: string): FinalFare | undefined => {
-    const fare = order.fare;
-    if (!fare) {
+/** What the order costs: its purchase rate's amount, and the lines of its service quote when they were read. */
+const toFare = (order: OrderResource, estimate: string, quote?: QuoteResource): FinalFare | undefined => {
+    const amount = order.purchase_rate?.amount ?? order.transaction_amount;
+    const currency = order.purchase_rate?.currency ?? order.currency;
+    if (typeof amount !== 'number' || !currency) {
         return undefined;
     }
     return {
-        total: formatMoney(fare.total, fare.currency),
-        estimate: typeof fare.estimate === 'number' ? formatMoney(fare.estimate, fare.currency) : estimate,
-        lines: (fare.lines ?? []).map((line) => ({ label: line.label, amount: formatMoney(line.amount, fare.currency) })),
+        total: formatMoney(amount, currency),
+        estimate,
+        lines: (quote?.items ?? []).map((item) => ({ label: item.details || item.code || '', amount: formatMoney(item.amount, currency) })),
     };
 };
 
-const toTrip = (order: OrderResource): Trip | undefined => {
+const toTrip = (order: OrderResource, quote?: QuoteResource): Trip | undefined => {
     const pickup = toPlace(order.payload?.pickup);
     const dropoff = toPlace(order.payload?.dropoff);
     if ((order.status !== 'completed' && order.status !== 'canceled') || !pickup || !dropoff) {
@@ -184,13 +180,13 @@ const toTrip = (order: OrderResource): Trip | undefined => {
         id: order.id,
         status: order.status,
         date: order.created_at,
-        className: order.fare?.service ?? '',
+        className: order.purchase_rate?.service_name ?? quote?.service_name ?? '',
         pickup,
         dropoff,
         route: [pickup.location, dropoff.location],
         payment: method === 'cash' || method === 'card' ? method : undefined,
-        paid: order.paid_at ? true : undefined,
-        fare: toFare(order, ''),
+        paid: order.payment_status === 'paid' ? true : undefined,
+        fare: toFare(order, '', quote),
         summary: toSummary(order),
     };
 };
@@ -211,7 +207,7 @@ const reachableHost = (host: string) => {
  * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Rider data is connected; the rest is added milestone by
  * milestone (see ride-hailing/FLEETOPS-INTEGRATION-PLAN.md) and fails clearly until then.
  */
-export function createFleetbaseService({ host, key }: { host: string; key: string }): RideService {
+export function createFleetbaseService({ host, key, orderConfig = 'passenger' }: { host: string; key: string; orderConfig?: string }): RideService {
     let session: Session | undefined;
     let pickup: { at: number; place: Promise<Place> } | undefined;
     let stopWatching = () => {};
@@ -232,6 +228,12 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
         }
         const { invoice } = (await adapter('ledger/v1').get(`customers/orders/${rideId}/invoice`, {}, { headers: { 'Customer-Token': token } })) as InvoiceResource;
         return invoice;
+    };
+
+    /** The service quote an order was bought at, with its lines. Undefined when it can't be read. */
+    const quoteFor = async (order: OrderResource) => {
+        const id = order.purchase_rate?.service_quote;
+        return id ? ((await adapter().get(`service-quotes/${id}`).catch(() => undefined)) as QuoteResource | undefined) : undefined;
     };
 
     /** Message watchers per ride, so a sent message shows straight away. */
@@ -326,7 +328,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                     next.etaMinutes = minutes(next.status === 'in_progress' ? tracker?.eta?.completion_seconds : tracker?.route?.legs?.[0]?.duration_s) ?? next.etaMinutes;
                 }
                 if (next.status === 'completed') {
-                    next.fare = toFare(order, ride.quote.fare);
+                    next.fare = toFare(order, ride.quote.fare, await quoteFor(order));
                 }
                 current = next;
                 if (!stopped) {
@@ -399,8 +401,10 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
             endSession();
         },
         async rideSettings(): Promise<RideSettings> {
-            const settings = await asRider<{ emergency_number?: string | null; support?: { phone?: string | null; email?: string | null } }>((api, options) => api.get('customers/ride-settings', {}, options));
-            return { emergencyNumber: settings.emergency_number ?? undefined, supportPhone: settings.support?.phone ?? undefined, supportEmail: settings.support?.email ?? undefined };
+            // The operator's own phone number, from their organization. The emergency number and a
+            // support email come from the brand config.
+            const organization = (await adapter().get('organizations/current')) as OrganizationResource;
+            return { supportPhone: organization.phone || undefined };
         },
         currentPickup,
         savedPlaces,
@@ -435,7 +439,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                     id: quote.service_rate,
                     className: quote.service_name,
                     fare: formatMoney(quote.amount, quote.currency),
-                    seats: quote.seats ?? undefined,
+                    seats: quote.seating_capacity ?? undefined,
                     pickupMinutes: minutes(quote.pickup_eta),
                 })
             );
@@ -447,7 +451,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                 throw new Error('That option is no longer available. Choose another.');
             }
             const order = await asRider<OrderResource>((api, options) =>
-                api.post('customers/orders', { type: 'ride', service_quote: stored.id, pickup: placeInput(from), dropoff: placeInput(to), payment_method: payment }, options)
+                api.post('customers/orders', { type: orderConfig, service_quote: stored.id, pickup: placeInput(from), dropoff: placeInput(to), payment_method: payment }, options)
             );
             await asRider((api, options) => api.post(`customers/orders/${order.id}/dispatch`, {}, options));
             const ride: Ride = { id: order.id, status: 'searching', pickup: from, dropoff: to, quote, payment, route: [from.location, to.location] };
@@ -456,7 +460,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
         },
         async activeRide(onUpdate) {
             const orders = await asRider<OrderResource[]>((api, options) => api.get('customers/orders', { limit: 10, sort: '-created_at' }, options));
-            const order = orders.find((candidate) => candidate.type === 'ride' && candidate.dispatched && !isOver(rideStatus(candidate)));
+            const order = orders.find((candidate) => candidate.type === orderConfig && candidate.dispatched && !isOver(rideStatus(candidate)));
             const pickup = toPlace(order?.payload?.pickup);
             const dropoff = toPlace(order?.payload?.dropoff);
             if (!order || !pickup || !dropoff) {
@@ -468,7 +472,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                 status: rideStatus(order),
                 pickup,
                 dropoff,
-                quote: { id: '', className: order.fare?.service ?? '', fare: order.fare ? formatMoney(order.fare.total, order.fare.currency) : '' },
+                quote: { id: '', className: order.purchase_rate?.service_name ?? '', fare: toFare(order, '')?.total ?? '' },
                 payment: method === 'card' ? 'card' : 'cash',
                 route: [pickup.location, dropoff.location],
             };
@@ -494,7 +498,7 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
                 try {
                     const messages = await asRider<MessageResource[]>((api, options) => api.get(`customers/orders/${rideId}/messages`, {}, options));
                     if (!stopped) {
-                        onChange(messages.map((message): ChatMessage => ({ id: message.id, from: message.from, text: message.text, sentAt: message.sent_at })));
+                        onChange(messages.map((message): ChatMessage => ({ id: message.id, from: message.from === 'customer' ? 'rider' : 'driver', text: message.text, sentAt: message.sent_at })));
                     }
                 } catch {
                     // Tried again on the next refresh.
@@ -532,10 +536,14 @@ export function createFleetbaseService({ host, key }: { host: string; key: strin
         },
         async trips() {
             const orders = await asRider<OrderResource[]>((api, options) => api.get('customers/orders', { limit: 50 }, options));
-            return orders.flatMap((order) => toTrip(order) ?? []).sort((a, b) => b.date.localeCompare(a.date));
+            return orders
+                .filter((order) => order.type === orderConfig)
+                .flatMap((order) => toTrip(order) ?? [])
+                .sort((a, b) => b.date.localeCompare(a.date));
         },
         async trip(tripId) {
-            return toTrip(await asRider<OrderResource>((api, options) => api.get(`customers/orders/${tripId}`, {}, options)));
+            const order = await asRider<OrderResource>((api, options) => api.get(`customers/orders/${tripId}`, {}, options));
+            return toTrip(order, await quoteFor(order));
         },
     };
 }
