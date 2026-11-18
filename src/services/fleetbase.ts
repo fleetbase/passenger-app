@@ -204,8 +204,8 @@ const reachableHost = (host: string) => {
 };
 
 /**
- * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Rider data is connected; the rest is added milestone by
- * milestone (see ride-hailing/FLEETOPS-INTEGRATION-PLAN.md) and fails clearly until then.
+ * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Trips are orders of the order config named by
+ * `orderConfig`, which is Fleet-Ops' system Passenger config unless the operator chooses another.
  */
 export function createFleetbaseService({ host, key, orderConfig = 'passenger' }: { host: string; key: string; orderConfig?: string }): RideService {
     let session: Session | undefined;

@@ -48,15 +48,15 @@ It runs on iOS, Android and the web, from one React Native codebase.
 
 ## What the server needs
 
-- **Fleetbase with Fleet-Ops v0.7.0 or later** ([fleetbase/fleetops#426](https://github.com/fleetbase/fleetops/pull/426) until it's released). The app uses Fleet-Ops' generic customer API. Everything ride-specific comes from an order config: its flow, policies, triggers and custom fields.
+- **Fleetbase with Fleet-Ops v0.7.0 or later**, and v0.7.2 or later for the Passenger order config to be there without setup. The app uses Fleet-Ops' generic customer API. Everything ride-specific comes from an order config: its flow, policies, triggers and custom fields.
 - **A Fleetbase API key** for the operator's company, from Developers → API Keys in the Console. The key is built into the app, so anyone who has the app can read it. Fleetbase can't yet limit what a key reaches; that will come with permissions and roles for API keys in IAM. Until then, don't publish a build to the public.
-- **An order config made from Fleet-Ops' `passenger` template**, for the operator's company:
+- **Fleet-Ops' Passenger order config.** From Fleet-Ops v0.7.2 every organization has it, next to Transport, and it can't be deleted. On Fleet-Ops v0.7.0 or v0.7.1, make it for the operator's company:
 
   ```bash
   php artisan fleetops:create-order-config passenger --company={company}
   ```
 
-  You can also make it in the Console: **Fleet-Ops → Operations → Order Configs → New Order Config**, starting from **Passenger**. The template sets up the trip's steps: on the way, arrived, in trip, completed and no-show. Its policies cover the rest:
+  It sets up the trip's steps: on the way, arrived, in trip, completed and no-show. Its policies cover the rest:
   - customers' orders are adhoc, offered to one driver at a time for 20 seconds, and matched by the vehicle type of the service they chose;
   - card trips must be paid before the next booking;
   - customers can cancel until the trip starts;
