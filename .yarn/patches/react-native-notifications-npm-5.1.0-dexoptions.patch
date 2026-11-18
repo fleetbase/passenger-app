@@ -1,0 +1,14 @@
+diff --git a/lib/android/app/build.gradle b/lib/android/app/build.gradle
+index 30bb01cef8203426f9ec7c45c5d980157c24caa7..473d9ed0e4271353d07930cd6106800e52dd50b6 100644
+--- a/lib/android/app/build.gradle
++++ b/lib/android/app/build.gradle
+@@ -62,9 +62,6 @@ android {
+         targetCompatibility JavaVersion.VERSION_1_8
+     }
+ 
+-    dexOptions {
+-        javaMaxHeapSize "4g"
+-    }
+     buildTypes {
+         release {
+             minifyEnabled false

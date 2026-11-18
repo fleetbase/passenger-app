@@ -1579,6 +1579,7 @@ __metadata:
     react-native: 0.86.0
     react-native-keychain: ^10.0.0
     react-native-maps: 1.26.19
+    react-native-notifications: ^5.1.0
     react-native-safe-area-context: ^5.6.2
     react-native-screens: ^4.3.0
     react-native-svg: 15.15.5
@@ -11499,6 +11500,26 @@ __metadata:
     react-native-web:
       optional: true
   checksum: a4fae9a01cad4400668abfc29af2b8cf6fe07742582faee5e5a8f3e467a4fdbc7d4d4c2b1ec6aa21d7cf614d158a6ada87ef159defacecf012d56ed33a5aafde
+  languageName: node
+  linkType: hard
+
+"react-native-notifications@npm:5.1.0":
+  version: 5.1.0
+  resolution: "react-native-notifications@npm:5.1.0"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 27a201942fcb9e12c4d96ad9b0cb53f547da833e5864193285c68e2dcf03808601d396ea8292e13f7608228784ca70eb34447a13564758d8b7725492a59fc975
+  languageName: node
+  linkType: hard
+
+"react-native-notifications@patch:react-native-notifications@npm%3A5.1.0#./.yarn/patches/react-native-notifications-npm-5.1.0-dexoptions.patch::locator=%40fleetbase%2Fpassenger-app%40workspace%3A.":
+  version: 5.1.0
+  resolution: "react-native-notifications@patch:react-native-notifications@npm%3A5.1.0#./.yarn/patches/react-native-notifications-npm-5.1.0-dexoptions.patch::version=5.1.0&hash=b62806&locator=%40fleetbase%2Fpassenger-app%40workspace%3A."
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 182b8efa48e0027335727d1cf21dfd866caaf1e7155ef267a0188861a83554c8f2aac2146e08451906e5ca8f3233b1e25fe9df6a27f332e00376a27b07159646
   languageName: node
   linkType: hard
 

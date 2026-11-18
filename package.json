@@ -28,6 +28,7 @@
         "react-native": "0.86.0",
         "react-native-keychain": "^10.0.0",
         "react-native-maps": "1.26.19",
+        "react-native-notifications": "^5.1.0",
         "react-native-safe-area-context": "^5.6.2",
         "react-native-screens": "^4.3.0",
         "react-native-svg": "15.15.5",
@@ -69,5 +70,8 @@
     "engines": {
         "node": ">=20"
     },
-    "packageManager": "yarn@3.6.4"
+    "packageManager": "yarn@3.6.4",
+    "resolutions": {
+        "react-native-notifications@^5.1.0": "patch:react-native-notifications@npm%3A5.1.0#./.yarn/patches/react-native-notifications-npm-5.1.0-dexoptions.patch"
+    }
 }

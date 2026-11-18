@@ -91,3 +91,7 @@ yarn-error.log
 
 # Local settings
 /.env
+
+# The operator's Firebase project config, added per build
+android/app/google-services.json
+ios/GoogleService-Info.plist
