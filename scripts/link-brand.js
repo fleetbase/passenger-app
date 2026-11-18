@@ -13,7 +13,7 @@
  * Each one is optional. Missing files fall back to the templates at the repository
  * root (passenger.brand.ts, passenger.extensions.ts) or to nothing.
  *
- * It also writes FLEETBASE_HOST, FLEETBASE_API_KEY and PASSENGER_SAMPLE_DATA from the
+ * It also writes FLEETBASE_HOST, FLEETBASE_API_KEY, FLEETBASE_ORDER_CONFIG and PASSENGER_SAMPLE_DATA from the
  * environment or .env.
  *
  * The result is written to src/generated (git-ignored) as plain modules, so Metro,
@@ -94,7 +94,7 @@ function linkBrand(root = path.resolve(__dirname, '..')) {
     writeIfChanged(
         path.join(outDir, 'env.ts'),
         `${HEADER}export const env = ${JSON.stringify(
-            { host, key: setting('FLEETBASE_API_KEY'), sampleData: setting('PASSENGER_SAMPLE_DATA') === 'true' },
+            { host, key: setting('FLEETBASE_API_KEY'), orderConfig: setting('FLEETBASE_ORDER_CONFIG') || 'passenger', sampleData: setting('PASSENGER_SAMPLE_DATA') === 'true' },
             null,
             4
         )};\n`
