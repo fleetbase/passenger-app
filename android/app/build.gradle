@@ -72,6 +72,27 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * A build setting: the environment first, then the app's .env, then android/local.properties.
+ * A store build sets its own app ID, version and upload key this way; a local build sets
+ * GOOGLE_MAPS_API_KEY in local.properties or .env.
+ */
+def buildSettingFiles = [rootProject.file("../.env"), rootProject.file("local.properties")].findAll { it.exists() }.collect { file ->
+    def values = new Properties()
+    file.eachLine { line ->
+        def text = line.trim()
+        def at = text.indexOf("=")
+        if (text && !text.startsWith("#") && at > 0) {
+            values.setProperty(text.substring(0, at).trim(), text.substring(at + 1).trim().replaceAll(/^"(.*)"$/, '$1').replace('\\"', '"'))
+        }
+    }
+    values
+}
+ext.buildSetting = { String name ->
+    def value = System.getenv(name) ?: buildSettingFiles.findResult { it.getProperty(name) }
+    value ? value : null
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -79,17 +100,12 @@ android {
 
     namespace "io.fleetbase.passenger"
     defaultConfig {
-        applicationId "io.fleetbase.passenger"
+        applicationId buildSetting("APP_IDENTIFIER") ?: "io.fleetbase.passenger"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
-        def localProperties = new Properties()
-        def localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.withInputStream { localProperties.load(it) }
-        }
-        manifestPlaceholders = [googleMapsApiKey: localProperties.getProperty("GOOGLE_MAPS_API_KEY", "")]
+        versionCode buildSetting("ANDROID_VERSION_CODE")?.toInteger() ?: 1
+        versionName buildSetting("ANDROID_VERSION_NAME") ?: "1.0"
+        manifestPlaceholders = [googleMapsApiKey: buildSetting("GOOGLE_MAPS_API_KEY") ?: ""]
     }
     signingConfigs {
         debug {
@@ -98,15 +114,23 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // A store build's upload key, when the build sets one (AppHelm's build machines do).
+        if (buildSetting("ANDROID_UPLOAD_STORE_FILE")) {
+            upload {
+                storeFile file(buildSetting("ANDROID_UPLOAD_STORE_FILE"))
+                storePassword buildSetting("ANDROID_UPLOAD_STORE_PASSWORD")
+                keyAlias buildSetting("ANDROID_UPLOAD_KEY_ALIAS")
+                keyPassword buildSetting("ANDROID_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Signed with the upload key when one is set, or else the debug key for local release builds.
+            signingConfig signingConfigs.findByName("upload") ?: signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
