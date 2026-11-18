@@ -111,7 +111,7 @@ yarn android
 yarn web
 ```
 
-Android also needs a Google Maps key in `android/local.properties`:
+Android also needs a Google Maps key, in `android/local.properties` or `.env`:
 
 ```properties
 GOOGLE_MAPS_API_KEY=your-key
@@ -134,6 +134,14 @@ Settings are read from `.env` (or the environment) when the app is built, by `sc
 | `FLEETBASE_API_KEY` | The operator's Fleetbase API key, from Developers → API Keys in the Console. |
 | `FLEETBASE_ORDER_CONFIG` | The key of the Fleet-Ops order config the app books. Defaults to `passenger`. |
 | `PASSENGER_SAMPLE_DATA` | `true` runs on built-in sample data with no server. |
+
+A store build also sets these for Android, in the environment or `.env`. A local release build without an upload key is signed with the debug key.
+
+| Setting | What it is |
+|---|---|
+| `APP_IDENTIFIER` | The application ID. Defaults to `io.fleetbase.passenger`. |
+| `ANDROID_VERSION_CODE`, `ANDROID_VERSION_NAME` | The build number and version. |
+| `ANDROID_UPLOAD_STORE_FILE`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, `ANDROID_UPLOAD_KEY_PASSWORD` | The upload key that signs the release build. |
 
 ## Sample data
 
@@ -207,7 +215,7 @@ This follows the same conventions as the other Fleetbase repositories.
 
 Merging runs `release.yml`, which checks that the branch name, `package.json` and `RELEASE.md` agree, then pushes the `v<version>` tag. The tag runs `create-release.yml`, which publishes the GitHub Release with `RELEASE.md` as its notes. If the tag step fails after a merge, run **Release Tag** by hand from the Actions tab with the version.
 
-Store builds aren't made here. Operators will publish their branded app through AppHelm, which doesn't support Passenger yet.
+Store builds aren't made here. Operators will publish their branded app through AppHelm, where Passenger support is being added.
 
 ## License
 
