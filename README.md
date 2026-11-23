@@ -133,6 +133,7 @@ Settings are read from `.env` (or the environment) when the app is built, by `sc
 | `FLEETBASE_HOST` | Your Fleetbase API, for example `http://localhost:8000`. Android emulators reach this machine at `10.0.2.2`, and the app handles that. |
 | `FLEETBASE_API_KEY` | The operator's Fleetbase API key, from Developers → API Keys in the Console. |
 | `FLEETBASE_ORDER_CONFIG` | The key of the Fleet-Ops order config the app books. Defaults to `passenger`. |
+| `FLEETBASE_PUSH_APP` | The app's push app key, from Fleet-Ops → Settings → Push Apps. Riders' pushes are then sent with your own Apple and Firebase keys. Leave it empty to use the push settings of the Fleetbase install. |
 | `PASSENGER_SAMPLE_DATA` | `true` runs on built-in sample data with no server. |
 
 A store build also sets these for Android, in the environment or `.env`. A local release build without an upload key is signed with the debug key.
@@ -142,6 +143,19 @@ A store build also sets these for Android, in the environment or `.env`. A local
 | `APP_IDENTIFIER` | The application ID. Defaults to `io.fleetbase.passenger`. |
 | `ANDROID_VERSION_CODE`, `ANDROID_VERSION_NAME` | The build number and version. |
 | `ANDROID_UPLOAD_STORE_FILE`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, `ANDROID_UPLOAD_KEY_PASSWORD` | The upload key that signs the release build. |
+
+### Push notifications
+
+Riders get a push at each step of a trip, from the Passenger order config's triggers: driver on the way, driver arrived, trip started, trip completed, and when the driver is about 400 m away. The app asks for permission after sign-in and sends its push token to Fleet-Ops with `FLEETBASE_PUSH_APP`. Tapping a push opens the trip.
+
+1. In the Console, add the app under **Fleet-Ops → Settings → Push Apps**:
+   - **iOS:** an APNs key (.p8) from your Apple Developer account, with its key ID, your team ID and the app's bundle ID.
+   - **Android:** the service account JSON of the app's Firebase project.
+2. Set `FLEETBASE_PUSH_APP` to the push app's key.
+3. For Android, put the Firebase project's `google-services.json` in `android/app` (git-ignored). Without it the app builds and runs, but doesn't register for pushes on Android.
+4. For iOS, give the app the Push Notifications capability in your Apple Developer account. The project already has the entitlement and the remote-notification background mode.
+
+Push needs Fleet-Ops v0.7.2 or later, with core-api v2.0.3. The web build doesn't receive pushes.
 
 ## Sample data
 

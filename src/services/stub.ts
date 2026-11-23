@@ -210,6 +210,8 @@ export function createStubService(): RideService {
         },
         onSessionExpired() {},
         async signOut() {},
+        // Sample data has no server to send pushes.
+        async registerDevice() {},
         async requestCode() {},
         async verifyCode(phone) {
             return { firstName: 'Sam', lastName: 'Reed', phone } satisfies Profile;

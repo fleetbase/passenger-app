@@ -118,6 +118,8 @@ export interface RideService {
     /** Runs when the server rejects the rider's sign-in, for example after it was revoked. */
     onSessionExpired(listener: () => void): void;
     signOut(): Promise<void>;
+    /** Tells Fleet-Ops where to send the signed-in rider's pushes: this device's push token, sent with the build's push app key. */
+    registerDevice(device: PushDevice): Promise<void>;
     requestCode(phone: string): Promise<void>;
     /** `needs-name` means the code is right but the number has no account. Call again with a name to create one. */
     verifyCode(phone: string, code: string, name?: string): Promise<Profile | 'needs-name'>;
@@ -146,3 +148,6 @@ export interface RideService {
     trips(): Promise<Trip[]>;
     trip(tripId: string): Promise<Trip | undefined>;
 }
+
+/** A device's push token. `environment` is the APNs build an iOS token belongs to. */
+export type PushDevice = { token: string; platform: 'ios' | 'android'; environment?: 'production' | 'sandbox' };
