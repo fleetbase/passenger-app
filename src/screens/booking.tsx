@@ -18,7 +18,7 @@ const FALLBACK_CENTER = { latitude: 1.2847, longitude: 103.8511 };
 const ClassCard = componentSlot('booking.classCard', function DefaultClassCard({ quote, index, selected, onPress }: ComponentPropsMap['booking.classCard']) {
     const theme = useTheme();
     return (
-        <Pressable style={{ flex: 1 }} accessibilityRole='radio' accessibilityState={{ selected }} onPress={onPress}>
+        <Pressable testID='class-card' style={{ flex: 1 }} accessibilityRole='radio' accessibilityState={{ selected }} onPress={onPress}>
             <YStack borderRadius={24} backgroundColor='$surface' borderWidth={3} borderColor={selected ? '$route' : 'transparent'} padding={16} gap={6} {...floating}>
                 <Icon name={index === 0 ? 'car' : 'van'} size={44} color={selected ? theme.route.val : theme.sub.val} />
                 <T variant='action'>{quote?.className ?? ' '}</T>
@@ -70,14 +70,14 @@ export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ho
                     <YStack height={48} paddingHorizontal={18} borderRadius={24} backgroundColor='$surface' justifyContent='center' {...floating}>
                         <BrandLogo />
                     </YStack>
-                    <RoundButton icon='user' label='Account' onPress={() => navigation.navigate('Account')} />
+                    <RoundButton icon='user' label='Account' onPress={() => navigation.navigate('Account')} testID='home-account' />
                 </XStack>
             </TopStack>
             <BottomStack>
                 {error ? <Banner tone='danger' text={error} /> : null}
                 <XStack gap={8}>
                     {saved.slice(0, 2).map((place) => (
-                        <Pressable key={place.id} style={{ flex: 1 }} accessibilityRole='button' onPress={() => goTo(place)}>
+                        <Pressable key={place.id} testID={`home-place-${place.saved}`} style={{ flex: 1 }} accessibilityRole='button' onPress={() => goTo(place)}>
                             <XStack height={72} borderRadius={24} backgroundColor='$surface' alignItems='center' gap={10} paddingHorizontal={14} {...floating}>
                                 <YStack width={40} height={40} borderRadius={20} backgroundColor='$tint' alignItems='center' justifyContent='center'>
                                     <Icon name={place.saved === 'home' ? 'home' : place.saved === 'work' ? 'work' : 'pin'} size={20} color={theme.ink.val} />
@@ -92,7 +92,7 @@ export function HomeScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ho
                 </XStack>
                 <Card>
                     <T variant='title'>Where are you going{profile ? `, ${profile.firstName}` : ''}?</T>
-                    <Pressable accessibilityRole='button' onPress={() => navigation.navigate('Destination')}>
+                    <Pressable testID='home-where-to' accessibilityRole='button' onPress={() => navigation.navigate('Destination')}>
                         <XStack height={60} borderRadius={30} backgroundColor='$accent' alignItems='center' gap={12} paddingHorizontal={20}>
                             <Icon name='search' color={theme.on.val} />
                             <T variant='action' tone='$on'>Where to?</T>
@@ -143,15 +143,16 @@ export function DestinationScreen({ navigation }: NativeStackScreenProps<RootSta
     return (
         <Screen>
             <XStack>
-                <RoundButton icon='back' label='Back' onPress={navigation.goBack} />
+                <RoundButton icon='back' label='Back' onPress={navigation.goBack} testID='back' />
             </XStack>
             <Field label='Pickup' value={pickup?.name ?? ''} editable={false} />
             {pickupError ? <Banner tone='danger' text={pickupError} /> : null}
-            <Field label='Dropoff' value={query} onChangeText={setQuery} placeholder='Where to?' autoFocus autoCorrect={false} />
+            <Field testID='destination-input' label='Dropoff' value={query} onChangeText={setQuery} placeholder='Where to?' autoFocus autoCorrect={false} />
             <ScrollView keyboardShouldPersistTaps='handled'>
                 {results.map((place, index) => (
                     <Row
                         key={place.id}
+                        testID='place-row'
                         title={place.name}
                         subtitle={place.detail}
                         icon={place.saved === 'home' ? 'home' : place.saved === 'work' ? 'work' : 'pin'}
@@ -225,7 +226,7 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
             />
             <TopStack>
                 <XStack gap={12} alignItems='center'>
-                    <RoundButton icon='back' label='Back' onPress={navigation.goBack} />
+                    <RoundButton icon='back' label='Back' onPress={navigation.goBack} testID='back' />
                     <YStack flex={1} height={48} paddingHorizontal={16} borderRadius={24} backgroundColor='$surface' justifyContent='center' {...floating}>
                         <T variant='secondary' fontWeight='600' numberOfLines={1}>{pickup?.name} → {dropoff?.name}</T>
                     </YStack>
@@ -239,14 +240,14 @@ export function ChooseScreen({ navigation }: NativeStackScreenProps<RootStack, '
                     })}
                 </XStack>
                 <Card padding={12} gap={8}>
-                    <Pressable accessibilityRole='button' accessibilityLabel='Change payment method' onPress={() => setPayment(payment === 'cash' ? 'card' : 'cash')}>
+                    <Pressable testID='payment-method' accessibilityRole='button' accessibilityLabel='Change payment method' onPress={() => setPayment(payment === 'cash' ? 'card' : 'cash')}>
                         <XStack minHeight={48} alignItems='center' gap={10} paddingHorizontal={8}>
                             <Icon name={payment === 'cash' ? 'cash' : 'card'} color={theme.text.val} />
                             <T variant='strong' flex={1}>{payment === 'cash' ? 'Pay with cash' : 'Pay by card after the trip'}</T>
                             <T variant='secondary' tone='$sub' fontWeight='600'>Change</T>
                         </XStack>
                     </Pressable>
-                    <Button label={quote ? `Request ${quote.className}` : quotes ? 'No rides available' : 'Getting fares'} onPress={request} disabled={!quote} loading={busy} />
+                    <Button testID='request-ride' label={quote ? `Request ${quote.className}` : quotes ? 'No rides available' : 'Getting fares'} onPress={request} disabled={!quote} loading={busy} />
                 </Card>
             </BottomStack>
         </YStack>

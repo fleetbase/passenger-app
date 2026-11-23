@@ -78,7 +78,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
 
             {status === 'driver_en_route' ? (
                 <TopStack>
-                    <Card paddingVertical={14} gap={2}>
+                    <Card testID='ride-en-route' paddingVertical={14} gap={2}>
                         <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{ride.etaMinutes ? `Arriving in ${ride.etaMinutes} min` : 'Your driver is on the way'}</T>
                         <T variant='secondary' tone='$sub'>Pickup at {ride.pickup.name}</T>
                     </Card>
@@ -86,7 +86,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
             ) : null}
             {status === 'arrived' && driver ? (
                 <TopStack>
-                    <Card backgroundColor='$accent' paddingVertical={16} gap={2}>
+                    <Card testID='ride-arrived' backgroundColor='$accent' paddingVertical={16} gap={2}>
                         <T variant='title' tone='$on'>{driver.name.split(' ')[0]} is here</T>
                         <T variant='secondary' tone='$on'>Waiting at the pickup point on {ride.pickup.name}</T>
                     </Card>
@@ -94,7 +94,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
             ) : null}
             {onTrip ? (
                 <TopStack>
-                    <Card paddingVertical={14} gap={2}>
+                    <Card testID='ride-in-progress' paddingVertical={14} gap={2}>
                         <T variant='title' style={{ fontVariant: ['tabular-nums'] }}>{ride.etaMinutes ? `${ride.etaMinutes} min to go` : 'On your way'}</T>
                         <T variant='secondary' tone='$sub'>Heading to {ride.dropoff.name}</T>
                     </Card>
@@ -119,9 +119,9 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
                 <Card>
                     {status === 'searching' ? (
                         <>
-                            <T variant='title'>Finding your driver</T>
+                            <T testID='ride-searching' variant='title'>Finding your driver</T>
                             <T tone='$sub'>Pickup at {ride.pickup.name}. Estimated fare {ride.quote.fare}.</T>
-                            <Button label='Cancel request' kind='second' onPress={cancel} />
+                            <Button testID='ride-cancel-request' label='Cancel request' kind='second' onPress={cancel} />
                         </>
                     ) : null}
 
@@ -147,7 +147,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
                             {onTrip ? (
                                 <XStack gap={8}>
                                     <Button label='Share trip' kind='second' flex={1} onPress={shareTrip} />
-                                    <Button label='Safety' kind='second' flex={1} onPress={() => setSafety(true)} />
+                                    <Button testID='ride-safety' label='Safety' kind='second' flex={1} onPress={() => setSafety(true)} />
                                 </XStack>
                             ) : (
                                 <>
@@ -158,7 +158,7 @@ export function RideScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ri
                                     />
                                     <XStack gap={8}>
                                         <Button label='Cancel' kind='second' flex={1} onPress={cancel} />
-                                        <Button label={`Message ${driver.name.split(' ')[0]}`} flex={2} onPress={() => navigation.navigate('Chat')} />
+                                        <Button testID='ride-message-driver' label={`Message ${driver.name.split(' ')[0]}`} flex={2} onPress={() => navigation.navigate('Chat')} />
                                     </XStack>
                                 </>
                             )}
@@ -220,7 +220,7 @@ export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay
         <Screen>
             <ScrollView contentContainerStyle={{ gap: 14 }}>
                 <T variant='title'>{stage === 'paid' ? 'Thanks for riding' : cash ? `Pay ${driverName} in cash` : 'Trip complete'}</T>
-                <T variant='glance' style={{ fontVariant: ['tabular-nums'] }}>{ride.fare.total}</T>
+                <T testID='pay-fare' variant='glance' style={{ fontVariant: ['tabular-nums'] }}>{ride.fare.total}</T>
                 <Lines lines={ride.fare.lines} />
                 <T variant='secondary' tone='$sub'>Your estimate was {ride.fare.estimate}. The final fare uses the trip's actual distance and time.</T>
                 {stage === 'failed' ? <Banner tone='danger' text="Your payment didn't go through. You'll need to settle this before your next ride." /> : null}
@@ -229,7 +229,7 @@ export function PayScreen({ navigation }: NativeStackScreenProps<RootStack, 'Pay
             {stage === 'paid' ? <Button label='View receipt' kind='second' onPress={() => navigation.navigate('Receipt', { tripId: ride.id })} /> : null}
             {stage === 'failed' ? <Button label={`Contact ${brand.name}`} kind='second' onPress={() => navigation.navigate('Help')} /> : null}
             {cash || stage === 'paid' ? (
-                <Button label={cash ? "I've paid, rate my ride" : 'Rate my ride'} onPress={rate} />
+                <Button testID='pay-rate' label={cash ? "I've paid, rate my ride" : 'Rate my ride'} onPress={rate} />
             ) : (
                 <Button label={stage === 'failed' ? 'Try again' : 'Continue to payment'} onPress={startCheckout} />
             )}
@@ -260,12 +260,13 @@ export function RateScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ra
             <T variant='title' textAlign='center'>How was your ride with {first}?</T>
             <XStack gap={4}>
                 {[1, 2, 3, 4, 5].map((value) => (
-                    <Pressable key={value} accessibilityRole='button' accessibilityLabel={`${value} stars`} onPress={() => setStars(value)} style={{ padding: 5 }}>
+                    <Pressable key={value} testID={`rate-star-${value}`} accessibilityRole='button' accessibilityLabel={`${value} stars`} onPress={() => setStars(value)} style={{ padding: 5 }}>
                         <Icon name='star' size={46} color={value <= stars ? '#F5A623' : theme.sub.val} fill={value <= stars ? '#F5A623' : 'none'} />
                     </Pressable>
                 ))}
             </XStack>
             <TextInput
+                testID='rate-comment'
                 accessibilityLabel='Comment'
                 value={comment}
                 onChangeText={setComment}
@@ -275,8 +276,8 @@ export function RateScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ra
             />
             <YStack flex={1} />
             <YStack alignSelf='stretch' gap={6}>
-                <Button label='Submit' onPress={() => finish(true)} disabled={stars === 0} />
-                <Button label='Skip' kind='ghost' onPress={() => finish(false)} />
+                <Button testID='rate-submit' label='Submit' onPress={() => finish(true)} disabled={stars === 0} />
+                <Button testID='rate-skip' label='Skip' kind='ghost' onPress={() => finish(false)} />
             </YStack>
         </Screen>
     );

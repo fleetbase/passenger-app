@@ -1,0 +1,14 @@
+# The driver accepted (the capture's driver actor): the car on its way, the driver and plate.
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+      visible:
+          id: ride-en-route
+      timeout: 120000
+- extendedWaitUntil:
+      visible:
+          id: ride-message-driver
+      timeout: 90000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-ride-details-en-route${SHOT_SUFFIX}

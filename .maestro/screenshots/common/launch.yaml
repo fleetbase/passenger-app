@@ -1,0 +1,25 @@
+# Fresh start: no saved state, location allowed, the rider placed at the seeded pickup.
+appId: ${APP_ID}
+---
+- setLocation:
+      latitude: ${LATITUDE}
+      longitude: ${LONGITUDE}
+- launchApp:
+      clearState: true
+      permissions:
+          all: allow
+# On iOS the rider's session is in the keychain, which clearState keeps. Sign out so every run
+# starts on the sign-in screen.
+- extendedWaitUntil:
+      visible:
+          id: phone-number|home-account
+      timeout: 120000
+- runFlow:
+      when:
+          visible:
+              id: home-account
+      commands:
+          - tapOn:
+                id: home-account
+          - tapOn:
+                id: account-sign-out

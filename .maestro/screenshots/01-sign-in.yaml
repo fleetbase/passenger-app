@@ -1,0 +1,73 @@
+# Sign-in, the verification code, then home: the pickup is where the rider stands, the drop-off
+# is still to choose. The server accepts VERIFICATION_CODE only for the numbers in
+# FLEETOPS_CUSTOMER_REVIEW_ACCOUNTS.
+appId: ${APP_ID}
+---
+- runFlow: common/launch.yaml
+- extendedWaitUntil:
+      visible:
+          id: phone-number
+      timeout: 90000
+- tapOn:
+      id: phone-number
+- inputText: ${RIDER_PHONE}
+- takeScreenshot: passenger-app-login-create${SHOT_SUFFIX}
+- tapOn:
+      id: sign-in-send-code
+- extendedWaitUntil:
+      visible:
+          id: code-input
+      timeout: 90000
+      optional: true
+# A failed request leaves the number on screen with an error: send again.
+- retry:
+      maxRetries: 2
+      commands:
+          - runFlow:
+                when:
+                    notVisible:
+                        id: code-input
+                commands:
+                    - tapOn:
+                          id: sign-in-send-code
+          - extendedWaitUntil:
+                visible:
+                    id: code-input
+                timeout: 90000
+# Before typing: the code changes on every run, so a typed one would change the screenshot, and
+# it has no place in a published image.
+- takeScreenshot: passenger-app-login-create-code${SHOT_SUFFIX}
+- inputText: ${VERIFICATION_CODE}
+- tapOn:
+      id: verify-code-submit
+# Home is ready once the saved places have loaded (they sit above the "Where to?" card). Home
+# reloads them each time it comes back into view, so if they failed to load (a slow stack), go
+# to the account and back, as a rider would.
+- extendedWaitUntil:
+      visible:
+          id: home-where-to
+      timeout: 120000
+- extendedWaitUntil:
+      visible:
+          id: home-place-home
+      timeout: 60000
+      optional: true
+- retry:
+      maxRetries: 3
+      commands:
+          - runFlow:
+                when:
+                    notVisible:
+                        id: home-place-home
+                commands:
+                    - tapOn:
+                          id: home-account
+                    - tapOn:
+                          id: back
+          - extendedWaitUntil:
+                visible:
+                    id: home-place-home
+                timeout: 45000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-booking-create${SHOT_SUFFIX}

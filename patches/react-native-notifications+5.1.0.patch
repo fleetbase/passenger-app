@@ -1,0 +1,52 @@
+diff --git a/node_modules/react-native-notifications/lib/android/app/src/main/java/com/wix/reactnativenotifications/fcm/FcmToken.java b/node_modules/react-native-notifications/lib/android/app/src/main/java/com/wix/reactnativenotifications/fcm/FcmToken.java
+index 7db6e8d..25392ce 100644
+--- a/node_modules/react-native-notifications/lib/android/app/src/main/java/com/wix/reactnativenotifications/fcm/FcmToken.java
++++ b/node_modules/react-native-notifications/lib/android/app/src/main/java/com/wix/reactnativenotifications/fcm/FcmToken.java
+@@ -7,6 +7,7 @@ import android.util.Log;
+ import com.facebook.react.ReactApplication;
+ import com.facebook.react.ReactInstanceManager;
+ import com.facebook.react.bridge.ReactContext;
++import com.google.firebase.FirebaseApp;
+ import com.google.firebase.messaging.FirebaseMessaging;
+ import com.wix.reactnativenotifications.BuildConfig;
+ import com.wix.reactnativenotifications.core.JsIOHelper;
+@@ -72,6 +73,13 @@ public class FcmToken implements IFcmToken {
+     }
+ 
+     protected void refreshToken() {
++        // A build without google-services.json has no Firebase project, so there is no token to
++        // get, and asking for one threw "Default FirebaseApp is not initialized" and crashed the
++        // app as it started.
++        if (FirebaseApp.getApps(mAppContext).isEmpty()) {
++            if (BuildConfig.DEBUG) Log.i(LOGTAG, "No Firebase project in this build => no FCM token");
++            return;
++        }
+         FirebaseMessaging.getInstance().getToken()
+             .addOnCompleteListener(task -> {
+                 if (!task.isSuccessful()) {
+@@ -88,8 +96,23 @@ public class FcmToken implements IFcmToken {
+     }
+ 
+     protected void sendTokenToJS() {
+-        final ReactInstanceManager instanceManager = ((ReactApplication) mAppContext).getReactNativeHost().getReactInstanceManager();
+-        final ReactContext reactContext = instanceManager.getCurrentReactContext();
++        // New architecture (bridgeless): the ReactHost holds the context. The app has no legacy
++        // ReactNativeHost, and asking for one throws, which crashed the app as soon as FCM
++        // delivered a token.
++        ReactContext reactContext = null;
++        try {
++            if (((ReactApplication) mAppContext).getReactHost() != null) {
++                reactContext = ((ReactApplication) mAppContext).getReactHost().getCurrentReactContext();
++            }
++        } catch (Throwable ignored) {
++        }
++        if (reactContext == null) {
++            try {
++                final ReactInstanceManager instanceManager = ((ReactApplication) mAppContext).getReactNativeHost().getReactInstanceManager();
++                reactContext = instanceManager.getCurrentReactContext();
++            } catch (Throwable ignored) {
++            }
++        }
+ 
+         // Note: Cannot assume react-context exists cause this is an async dispatched service.
+         if (reactContext != null && reactContext.hasActiveCatalystInstance()) {

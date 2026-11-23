@@ -51,9 +51,9 @@ export function T({ variant = 'body', tone = '$text', ...props }: TextProps & { 
     return <Text fontFamily='$body' color={tone} {...scale[variant]} {...props} />;
 }
 
-type ButtonProps = { label: string; onPress?: () => void; kind?: 'primary' | 'second' | 'ghost' | 'danger'; disabled?: boolean; loading?: boolean; flex?: number };
+type ButtonProps = { label: string; onPress?: () => void; kind?: 'primary' | 'second' | 'ghost' | 'danger'; disabled?: boolean; loading?: boolean; flex?: number; testID?: string };
 
-export function Button({ label, onPress, kind = 'primary', disabled, loading, flex }: ButtonProps) {
+export function Button({ label, onPress, kind = 'primary', disabled, loading, flex, testID }: ButtonProps) {
     const theme = useTheme();
     const colors = {
         primary: { background: theme.accent.val, text: theme.on.val, height: 60, variant: 'action' as const },
@@ -64,6 +64,7 @@ export function Button({ label, onPress, kind = 'primary', disabled, loading, fl
     const off = disabled || loading;
     return (
         <Pressable
+            testID={testID}
             accessibilityRole='button'
             accessibilityState={{ disabled: !!off }}
             disabled={off}
@@ -83,10 +84,10 @@ export function Button({ label, onPress, kind = 'primary', disabled, loading, fl
     );
 }
 
-export function RoundButton({ icon, label, onPress }: { icon: keyof typeof icons; label: string; onPress?: () => void }) {
+export function RoundButton({ icon, label, onPress, testID }: { icon: keyof typeof icons; label: string; onPress?: () => void; testID?: string }) {
     const theme = useTheme();
     return (
-        <Pressable accessibilityRole='button' accessibilityLabel={label} onPress={onPress} hitSlop={4}>
+        <Pressable testID={testID} accessibilityRole='button' accessibilityLabel={label} onPress={onPress} hitSlop={4}>
             <YStack width={48} height={48} borderRadius={24} backgroundColor='$surface' alignItems='center' justifyContent='center' {...floating}>
                 <Icon name={icon} color={theme.text.val} />
             </YStack>
@@ -131,10 +132,10 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     );
 }
 
-export function Row({ title, subtitle, icon, trailing, onPress, last, danger }: { title: string; subtitle?: string; icon?: keyof typeof icons; trailing?: string; onPress?: () => void; last?: boolean; danger?: boolean }) {
+export function Row({ title, subtitle, icon, trailing, onPress, last, danger, testID }: { title: string; subtitle?: string; icon?: keyof typeof icons; trailing?: string; onPress?: () => void; last?: boolean; danger?: boolean; testID?: string }) {
     const theme = useTheme();
     return (
-        <Pressable accessibilityRole={onPress ? 'button' : undefined} onPress={onPress}>
+        <Pressable testID={testID} accessibilityRole={onPress ? 'button' : undefined} onPress={onPress}>
             <XStack minHeight={60} alignItems='center' gap={12} paddingVertical={6} borderBottomWidth={last ? 0 : 1} borderBottomColor='$line'>
                 {icon ? (
                     <YStack width={40} height={40} borderRadius={20} backgroundColor={danger ? '$dangerBg' : '$tint'} alignItems='center' justifyContent='center'>
@@ -156,7 +157,7 @@ export function Header({ title, onBack }: { title: string; onBack: () => void })
     return (
         <>
             <XStack>
-                <RoundButton icon='back' label='Back' onPress={onBack} />
+                <RoundButton icon='back' label='Back' onPress={onBack} testID='back' />
             </XStack>
             <T variant='title'>{title}</T>
         </>

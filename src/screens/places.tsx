@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, ScrollView } from 'react-native';
 import { YStack } from 'tamagui';
 import type { RootStack } from '../navigation';
 import { failureText } from '../services/errors';
@@ -29,6 +29,7 @@ export function PlacesScreen({ navigation }: NativeStackScreenProps<RootStack, '
                 {places?.length === 0 ? <T tone='$sub'>Save the places you go most, so booking takes one tap.</T> : null}
                 {places?.map((place, index) => (
                     <Row
+                        testID='saved-place'
                         key={place.id}
                         title={place.name}
                         subtitle={place.detail}
@@ -76,7 +77,7 @@ export function EditPlaceScreen({ navigation, route }: NativeStackScreenProps<Ro
     };
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior='padding'>
             <Screen>
                 <Header title={placeId ? 'Edit place' : 'Add a place'} onBack={navigation.goBack} />
                 <Field label='Name' value={name} onChangeText={setName} placeholder='Gym' />
