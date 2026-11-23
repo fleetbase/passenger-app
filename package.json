@@ -1,6 +1,6 @@
 {
     "name": "@fleetbase/passenger-app",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "private": true,
     "license": "AGPL-3.0-or-later",
     "scripts": {
@@ -13,6 +13,7 @@
         "web": "webpack serve --mode development",
         "web:build": "webpack --mode production",
         "brand:link": "node scripts/link-brand.js",
+        "generate:app-icon": "node scripts/generate-app-icon.js",
         "postinstall": "patch-package && node scripts/link-brand.js"
     },
     "dependencies": {

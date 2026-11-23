@@ -176,10 +176,18 @@ Don't edit the templates at the repository root. A client build keeps its own fi
 | `brand/passenger.extensions.ts` | Replaces screens and components, and adds routes. See [docs/extending.md](docs/extending.md). |
 | `brand/fonts/` | Font files, named by their PostScript name. |
 | `brand/logo.png`, `brand/logo-dark.png` | The logo, for light and dark mode. |
+| `brand/app-icon.png` | The app icon, square and at least 1024×1024. `yarn generate:app-icon` makes every iOS and Android size from it. |
 
 Each file is optional. A missing one falls back to the root template. Run `yarn brand:link` after adding or removing a file; `yarn install` and the bundlers run it too.
 
 The native app name and identifier (`Passenger`, `io.fleetbase.passenger`), and the app icon, are the defaults. A store build for an operator sets its own when it's published.
+
+To use your own icon, put it at `brand/app-icon.png` and run `yarn generate:app-icon` (it needs [ImageMagick](https://imagemagick.org)). It writes every size into `ios/PassengerApp/Images.xcassets/AppIcon.appiconset` and Android's `mipmap-*` folders, replacing Passenger's:
+- **iOS:** transparency is filled with white, because the App Store refuses icons with it.
+- **Android 8 and later:** the launcher masks the icon to a circle or rounded square, cutting about a sixth off each side, so keep the important part in the middle. The adaptive icon's background is the image's top-left colour.
+- **Non-square images:** cropped to a square from the centre.
+
+The command changes tracked files, so run it in your build, not in a clone you pull releases into.
 
 The default icon and logo are in `assets/brand/`: `icon.svg` (the app icon), `icon-foreground.svg` (Android's adaptive icon layer, on Fleetbase blue `#4391EA`), and `logo.svg` and `logo-dark.svg` (for light and dark backgrounds). The iOS, Android and web icons are rendered from `icon.svg`.
 
