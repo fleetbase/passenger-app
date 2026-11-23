@@ -27,15 +27,15 @@ export function AccountScreen({ navigation }: NativeStackScreenProps<RootStack, 
         <Screen>
             <Header title='Account' onBack={navigation.goBack} />
             <ScrollView style={{ flex: 1 }}>
-                <Row title={`${profile.firstName} ${profile.lastName}`.trim()} subtitle={profile.phone} icon='user' trailing='Edit' onPress={() => navigation.navigate('EditProfile')} />
-                <Row title='Your trips' subtitle='History and receipts' icon='clock' onPress={() => navigation.navigate('Trips')} />
-                <Row title='Saved places' subtitle='Home, work and more' icon='pin' onPress={() => navigation.navigate('Places')} />
+                <Row testID='account-profile' title={`${profile.firstName} ${profile.lastName}`.trim()} subtitle={profile.phone} icon='user' trailing='Edit' onPress={() => navigation.navigate('EditProfile')} />
+                <Row testID='account-trips' title='Your trips' subtitle='History and receipts' icon='clock' onPress={() => navigation.navigate('Trips')} />
+                <Row testID='account-places' title='Saved places' subtitle='Home, work and more' icon='pin' onPress={() => navigation.navigate('Places')} />
                 {brand.appearance.allowUserToggle ? <Row title='Appearance' subtitle={APPEARANCES[current].label} icon='moon' trailing='Change' onPress={() => setAppearance(next.value)} /> : null}
                 {getBuildExtensions().accountLinks?.map((link) => <Row key={link.route} title={link.label} subtitle={link.subtitle} icon='star' onPress={() => navigation.navigate(link.route as never)} />)}
-                <Row title='Help' subtitle={`Contact ${brand.name}`} icon='help' onPress={() => navigation.navigate('Help')} />
+                <Row testID='account-help' title='Help' subtitle={`Contact ${brand.name}`} icon='help' onPress={() => navigation.navigate('Help')} />
                 <Row title='Delete account' subtitle='Removes your account and data' icon='trash' danger last onPress={() => navigation.navigate('DeleteAccount')} />
             </ScrollView>
-            <Button label='Sign out' kind='second' onPress={signOut} />
+            <Button testID='account-sign-out' label='Sign out' kind='second' onPress={signOut} />
         </Screen>
     );
 }
@@ -119,7 +119,7 @@ export function HelpScreen({ navigation }: NativeStackScreenProps<RootStack, 'He
             <Header title='Help' onBack={navigation.goBack} />
             <T tone='$sub'>Contact {brand.name} for help with a trip or your account.</T>
             <ScrollView style={{ flex: 1 }}>
-                {phone ? <Row title={`Call ${brand.name}`} subtitle={phone} icon='phone' onPress={() => Linking.openURL(`tel:${phone}`)} /> : null}
+                {phone ? <Row testID='help-call' title={`Call ${brand.name}`} subtitle={phone} icon='phone' onPress={() => Linking.openURL(`tel:${phone}`)} /> : null}
                 {email ? <Row title='Email support' subtitle={email} icon='mail' onPress={() => Linking.openURL(`mailto:${email}`)} /> : null}
                 <Row title='Lost something?' subtitle='Get help with a past trip' icon='car' onPress={() => navigation.navigate('Trips')} />
                 {termsUrl ? <Row title='Terms and privacy' icon='doc' onPress={() => Linking.openURL(termsUrl)} last /> : null}

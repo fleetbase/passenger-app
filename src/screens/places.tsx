@@ -29,6 +29,7 @@ export function PlacesScreen({ navigation }: NativeStackScreenProps<RootStack, '
                 {places?.length === 0 ? <T tone='$sub'>Save the places you go most, so booking takes one tap.</T> : null}
                 {places?.map((place, index) => (
                     <Row
+                        testID='saved-place'
                         key={place.id}
                         title={place.name}
                         subtitle={place.detail}

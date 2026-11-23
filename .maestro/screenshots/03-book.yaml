@@ -1,0 +1,55 @@
+# Booking, from home: the drop-off search with the saved places, the car classes with their
+# fares, then the request, which leaves the rider on "Finding your driver". The capture's driver
+# actor accepts after this flow.
+appId: ${APP_ID}
+---
+- tapOn:
+      id: home-where-to
+- extendedWaitUntil:
+      visible:
+          id: place-row
+      timeout: 90000
+- takeScreenshot: passenger-app-booking-create-destination${SHOT_SUFFIX}
+# Back to home, and the saved Home place as the drop-off: a fixed trip, so a fixed fare.
+- tapOn:
+      id: back
+- tapOn:
+      id: home-place-home
+# The fares are in once the request button names a class. They need a route from the server,
+# which a slow stack may not give in time: then back to home and choose Home again.
+- extendedWaitUntil:
+      visible:
+          id: request-ride
+          text: Request.*
+      timeout: 90000
+      optional: true
+- retry:
+      maxRetries: 2
+      commands:
+          - runFlow:
+                when:
+                    notVisible:
+                        id: request-ride
+                        text: Request.*
+                commands:
+                    - tapOn:
+                          id: back
+                    - tapOn:
+                          id: home-place-home
+          - extendedWaitUntil:
+                visible:
+                    id: request-ride
+                    text: Request.*
+                timeout: 90000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-quotes-list${SHOT_SUFFIX}
+- tapOn:
+      id: request-ride
+- extendedWaitUntil:
+      visible:
+          id: ride-searching
+      timeout: 120000
+- waitForAnimationToEnd:
+      timeout: 5000
+- takeScreenshot: passenger-app-ride-details-searching${SHOT_SUFFIX}

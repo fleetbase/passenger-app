@@ -1,0 +1,14 @@
+# The rider is on board, on the way to the drop-off.
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+      visible:
+          id: ride-in-progress
+      timeout: 120000
+- extendedWaitUntil:
+      visible:
+          id: ride-safety
+      timeout: 90000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-ride-details-in-progress${SHOT_SUFFIX}

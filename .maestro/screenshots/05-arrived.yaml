@@ -1,0 +1,10 @@
+# The driver is at the pickup.
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+      visible:
+          id: ride-arrived
+      timeout: 120000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-ride-details-arrived${SHOT_SUFFIX}

@@ -1,0 +1,31 @@
+# The trip is over: the final fare from the actual trip, then the rating. Ends back on home.
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+      visible:
+          id: pay-fare
+      timeout: 120000
+- waitForAnimationToEnd:
+      timeout: 5000
+- takeScreenshot: passenger-app-fare-details${SHOT_SUFFIX}
+# A tap while the fare is still settling can be lost: tap again until the rating opens.
+- retry:
+      maxRetries: 3
+      commands:
+          - tapOn:
+                id: pay-rate
+          - extendedWaitUntil:
+                visible:
+                    id: rate-star-5
+                timeout: 15000
+- tapOn:
+      id: rate-star-5
+- waitForAnimationToEnd:
+      timeout: 3000
+- takeScreenshot: passenger-app-rating-create${SHOT_SUFFIX}
+- tapOn:
+      id: rate-submit
+- extendedWaitUntil:
+      visible:
+          id: home-where-to
+      timeout: 90000

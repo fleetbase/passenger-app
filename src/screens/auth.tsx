@@ -56,11 +56,11 @@ export function SignInScreen() {
                     <>
                         <T variant='display'>{newRider ? "What's your name?" : 'Enter your code'}</T>
                         {newRider ? (
-                            <Field label='Your name' value={name} onChangeText={setName} textContentType='name' autoCorrect={false} autoFocus />
+                            <Field testID='rider-name' label='Your name' value={name} onChangeText={setName} textContentType='name' autoCorrect={false} autoFocus />
                         ) : (
                             <>
                                 <T tone='$sub'>Sent to {phone}</T>
-                                <Field label='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' placeholder='6 digits' textContentType='oneTimeCode' autoFocus />
+                                <Field testID='code-input' label='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' placeholder='6 digits' textContentType='oneTimeCode' autoFocus />
                             </>
                         )}
                     </>
@@ -68,12 +68,12 @@ export function SignInScreen() {
                     <>
                         <T variant='display'>Get a ride in minutes</T>
                         <T tone='$sub'>Enter your phone number and we'll text you a code.</T>
-                        <Field label='Phone number' value={phone} onChangeText={setPhone} keyboardType='phone-pad' placeholder='+1 555 0142' textContentType='telephoneNumber' />
+                        <Field testID='phone-number' label='Phone number' value={phone} onChangeText={setPhone} keyboardType='phone-pad' placeholder='+1 555 0142' textContentType='telephoneNumber' />
                     </>
                 )}
                 {error ? <Banner text={error} tone='danger' /> : null}
                 <YStack flex={1} />
-                {codeSent ? <Button label={newRider ? 'Continue' : 'Verify'} onPress={verify} loading={busy} disabled={code.length < 4 || (newRider && !name.trim())} /> : <Button label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
+                {codeSent ? <Button testID='verify-code-submit' label={newRider ? 'Continue' : 'Verify'} onPress={verify} loading={busy} disabled={code.length < 4 || (newRider && !name.trim())} /> : <Button testID='sign-in-send-code' label='Continue' onPress={sendCode} loading={busy} disabled={phone.length < 5} />}
             </Screen>
         </KeyboardAvoidingView>
     );

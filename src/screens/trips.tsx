@@ -18,6 +18,7 @@ const withClass = (trip: Trip) => [formatDate(trip.date), trip.className].filter
 
 const TripRow = componentSlot('trips.row', ({ trip, last, onPress }: ComponentPropsMap['trips.row']) => (
     <Row
+        testID='trip-row'
         title={trip.dropoff.name}
         subtitle={trip.status === 'canceled' ? `Canceled · ${formatDay(trip.date)}` : withClass(trip)}
         icon={trip.className === 'XL' ? 'van' : 'car'}
@@ -102,11 +103,11 @@ export function TripScreen({ navigation, route }: NativeStackScreenProps<RootSta
             <RideMap center={trip.pickup.location} pickup={trip.pickup.location} dropoff={trip.dropoff.location} route={trip.route} insets={{ top: 100, bottom: 360 }} />
             <TopStack>
                 <XStack>
-                    <RoundButton icon='back' label='Back' onPress={navigation.goBack} />
+                    <RoundButton icon='back' label='Back' onPress={navigation.goBack} testID='back' />
                 </XStack>
             </TopStack>
             <BottomStack>
-                <Card>
+                <Card testID='trip-details'>
                     <YStack>
                         <T variant='caption' tone='$sub'>{formatDate(trip.date)}</T>
                         <T variant='title'>{trip.dropoff.name}</T>
@@ -126,7 +127,7 @@ export function TripScreen({ navigation, route }: NativeStackScreenProps<RootSta
                         <T tone='$sub'>{trip.status === 'canceled' ? "This ride was canceled. You weren't charged." : "The fare for this trip isn't available."}</T>
                     )}
                     <XStack gap={8}>
-                        {trip.fare ? <Button label='Receipt' kind='second' flex={1} onPress={() => navigation.navigate('Receipt', { tripId: trip.id })} /> : null}
+                        {trip.fare ? <Button testID='trip-receipt' label='Receipt' kind='second' flex={1} onPress={() => navigation.navigate('Receipt', { tripId: trip.id })} /> : null}
                         <Button label='Get help' kind='second' flex={1} onPress={() => navigation.navigate('Help')} />
                     </XStack>
                 </Card>
@@ -169,7 +170,9 @@ export function ReceiptScreen({ navigation, route }: NativeStackScreenProps<Root
             <Header title='Receipt' onBack={navigation.goBack} />
             <ScrollView contentContainerStyle={{ gap: 14 }}>
                 <T tone='$sub'>{withClass(trip)}</T>
-                <Lines lines={fare.lines} total={{ label: totalLabel, amount: fare.total }} />
+                <YStack testID='receipt-lines'>
+                    <Lines lines={fare.lines} total={{ label: totalLabel, amount: fare.total }} />
+                </YStack>
                 <YStack>
                     {paidWith ? <Row title={paidWith} icon={trip.payment === 'cash' ? 'cash' : 'card'} /> : null}
                     <Row title={trip.pickup.name} subtitle={`to ${trip.dropoff.name}`} icon='pin' last />

@@ -1,0 +1,89 @@
+# The account and everything under it, from home: trips, one past trip and its receipt, saved
+# places and help. Ends back on home.
+appId: ${APP_ID}
+---
+- retry:
+      maxRetries: 3
+      commands:
+          - tapOn:
+                id: home-account
+          - extendedWaitUntil:
+                visible:
+                    id: account-trips
+                timeout: 20000
+- takeScreenshot: passenger-app-account-details${SHOT_SUFFIX}
+
+# The trips reload each time the screen comes into view: if they failed, go back and in again.
+- tapOn:
+      id: account-trips
+- extendedWaitUntil:
+      visible:
+          id: trip-row
+      timeout: 60000
+      optional: true
+- retry:
+      maxRetries: 3
+      commands:
+          - runFlow:
+                when:
+                    notVisible:
+                        id: trip-row
+                commands:
+                    - tapOn:
+                          id: back
+                    - tapOn:
+                          id: account-trips
+          - extendedWaitUntil:
+                visible:
+                    id: trip-row
+                timeout: 45000
+- takeScreenshot: passenger-app-trips-list${SHOT_SUFFIX}
+- tapOn:
+      id: trip-row
+      index: 0
+- extendedWaitUntil:
+      visible:
+          id: trip-receipt
+      timeout: 90000
+- waitForAnimationToEnd:
+      timeout: 8000
+- takeScreenshot: passenger-app-trip-details${SHOT_SUFFIX}
+- tapOn:
+      id: trip-receipt
+- extendedWaitUntil:
+      visible:
+          id: receipt-lines
+      timeout: 90000
+- takeScreenshot: passenger-app-receipt-details${SHOT_SUFFIX}
+- tapOn:
+      id: back
+- tapOn:
+      id: back
+- tapOn:
+      id: back
+
+- tapOn:
+      id: account-places
+- extendedWaitUntil:
+      visible:
+          id: saved-place
+      timeout: 90000
+- takeScreenshot: passenger-app-places-list${SHOT_SUFFIX}
+- tapOn:
+      id: back
+
+- tapOn:
+      id: account-help
+- extendedWaitUntil:
+      visible:
+          id: help-call
+      timeout: 90000
+- takeScreenshot: passenger-app-help-details${SHOT_SUFFIX}
+- tapOn:
+      id: back
+- tapOn:
+      id: back
+- extendedWaitUntil:
+      visible:
+          id: home-where-to
+      timeout: 90000
