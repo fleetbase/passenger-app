@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, TextInput } from 'react-native';
 import { useTheme, XStack, YStack } from 'tamagui';
 import { fontFace } from '../branding';
 import type { RootStack } from '../navigation';
@@ -47,7 +47,7 @@ export function ChatScreen({ navigation }: NativeStackScreenProps<RootStack, 'Ch
     };
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior='padding'>
             <Screen gap={10}>
                 <XStack alignItems='center' gap={12}>
                     <RoundButton icon='back' label='Back' onPress={navigation.goBack} />

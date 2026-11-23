@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native';
 import { YStack } from 'tamagui';
 import { BrandLogo } from '../branding/BrandLogo';
 import { failureText } from '../services/errors';
@@ -49,7 +49,7 @@ export function SignInScreen() {
     };
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior='padding'>
             <Screen>
                 <BrandLogo />
                 {codeSent ? (

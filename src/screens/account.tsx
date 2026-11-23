@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, Linking, ScrollView } from 'react-native';
 import { YStack } from 'tamagui';
 import { branding as brand } from '../branding';
 import type { RootStack } from '../navigation';
@@ -65,7 +65,7 @@ export function EditProfileScreen({ navigation }: NativeStackScreenProps<RootSta
     };
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior='padding'>
             <Screen>
                 <Header title='Your details' onBack={navigation.goBack} />
                 <Field label='First name' value={firstName} onChangeText={setFirstName} textContentType='givenName' />
