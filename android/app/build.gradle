@@ -147,3 +147,9 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Push on Android needs the app's Firebase project: put its google-services.json in android/app.
+// Without one the app builds and runs, and simply doesn't register for pushes.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}

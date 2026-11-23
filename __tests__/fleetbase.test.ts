@@ -455,3 +455,24 @@ describe('the chat with the driver', () => {
         expect(sent.length).toBe(calls);
     });
 });
+
+test('a push token is registered for the rider with the build push app key', async () => {
+    const sent = respondWith({
+        'POST customers/verify-code': () => [200, { name: 'Sam Rider', phone: '+15550190301', token: 'rider-token' }],
+        'POST customers/register-device': () => [200, { status: 'ok', device: 'device_1' }],
+    });
+    const service = createFleetbaseService({ host: 'http://api.test', key: 'flb_live_test', pushApp: 'push_app_bayline' });
+    await expect(service.registerDevice({ token: 'apns-token', platform: 'ios', environment: 'sandbox' })).rejects.toThrow('No rider is signed in');
+
+    await service.verifyCode('+15550190301', '123456');
+    await service.registerDevice({ token: 'apns-token', platform: 'ios', environment: 'sandbox' });
+    const register = sent[sent.length - 1];
+    expect(register.headers.get('Customer-Token')).toBe('rider-token');
+    expect(register.body).toEqual({ token: 'apns-token', platform: 'ios', environment: 'sandbox', push_app: 'push_app_bayline' });
+});
+
+test('without a push app key the token is registered for the install-wide push settings', async () => {
+    const { service, sent } = await signedIn({ 'POST customers/register-device': () => [200, { status: 'ok' }] });
+    await service.registerDevice({ token: 'fcm-token', platform: 'android' });
+    expect(sent[sent.length - 1].body).toEqual({ token: 'fcm-token', platform: 'android' });
+});

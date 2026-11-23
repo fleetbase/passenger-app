@@ -204,10 +204,10 @@ const reachableHost = (host: string) => {
 };
 
 /**
- * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Rider data is connected; the rest is added milestone by
- * milestone (see ride-hailing/FLEETOPS-INTEGRATION-PLAN.md) and fails clearly until then.
+ * `RideService` on the Fleet-Ops API, using the operator's Fleetbase API key. Trips are orders of the order config named by
+ * `orderConfig`, which is Fleet-Ops' system Passenger config unless the operator chooses another.
  */
-export function createFleetbaseService({ host, key, orderConfig = 'passenger' }: { host: string; key: string; orderConfig?: string }): RideService {
+export function createFleetbaseService({ host, key, orderConfig = 'passenger', pushApp }: { host: string; key: string; orderConfig?: string; pushApp?: string }): RideService {
     let session: Session | undefined;
     let pickup: { at: number; place: Promise<Place> } | undefined;
     let stopWatching = () => {};
@@ -376,6 +376,10 @@ export function createFleetbaseService({ host, key, orderConfig = 'passenger' }:
             if (token) {
                 await adapter().post('customers/logout', {}, { headers: { 'Customer-Token': token } }).catch(() => {});
             }
+        },
+        async registerDevice(device) {
+            // Without the build's push app key, Fleet-Ops sends with the install-wide push settings.
+            await asRider((api, options) => api.post('customers/register-device', { ...device, ...(pushApp ? { push_app: pushApp } : {}) }, options));
         },
         async requestCode(phone) {
             await adapter().post('customers/request-code', { phone });

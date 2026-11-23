@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 import { branding } from '../branding';
 import type { Appearance } from '../branding/schema';
 import { createService, sampleMode } from '../services';
+import { startPush } from '../services/push';
 import type { PaymentMethod, Place, Profile, Quote, Ride, RideService, RideSettings } from '../services/types';
 
 const service: RideService = createService();
@@ -56,6 +57,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 .then((active) => active && setRide((current) => current ?? active))
                 .catch(() => {});
         }
+    }, [signedIn]);
+
+    // Pushes about the rider's trips: the token goes to Fleet-Ops once signed in, and a tapped
+    // push brings the trip it is about back up.
+    useEffect(() => {
+        if (!signedIn || sampleMode) {
+            return;
+        }
+        return startPush({
+            onToken: (device) => {
+                service.registerDevice(device).catch(() => {});
+            },
+            onOpen: () => {
+                service
+                    .activeRide(setRide)
+                    .then((active) => active && setRide(active))
+                    .catch(() => {});
+            },
+        });
     }, [signedIn]);
 
     const contacts = useMemo(
