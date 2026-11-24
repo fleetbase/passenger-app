@@ -18,11 +18,22 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 
 It runs on iOS, Android and the web, from one React Native codebase.
 
-> **Early development. Don't use it for real rides yet.** The whole ride runs on Fleet-Ops, but it has only been proven on the web build against a local Fleetbase. It hasn't been tried on a phone.
+<p align="center">
+  <a href="https://fleetbase.io/platform/passenger">Passenger</a> · <a href="https://github.com/fleetbase/navigator-app">Navigator</a> · <a href="https://fleetbase.io/platform/fleetops">Fleet-Ops</a> · <a href="https://console.fleetbase.io">Console</a> · <a href="https://discord.gg/V7RVWRQ2Wm">Discord</a>
+</p>
+
+<p align="center">
+  <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-quotes-list.webp" width="240" alt="Choosing a car class: Standard and XL, each with seats, pickup time and an estimated fare" />
+  <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-arrived.webp" width="240" alt="The driver has arrived: the driver's name, car and number plate, with buttons to cancel or message the driver" />
+  <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-fare-details.webp" width="240" alt="The final fare from the trip's actual distance and time, with its breakdown" />
+</p>
+
+> **Early development. Don't use it for real rides yet.** The whole ride runs on Fleet-Ops and goes end to end on the iOS Simulator, the Android emulator and the web against a local Fleetbase, but it hasn't carried real riders.
 
 ## Contents
 
 - [What it does](#what-it-does)
+- [Screenshots](#screenshots)
 - [What the server needs](#what-the-server-needs)
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
@@ -44,7 +55,39 @@ It runs on iOS, Android and the web, from one React Native codebase.
 | After the trip | The final fare from the actual distance and time, with a breakdown, then cash to the driver or card through Ledger's hosted checkout. A rating for the driver. |
 | Account | Trip history and receipts, saved places, appearance (if the operator allows it), help with the operator's contacts, and account deletion. |
 
-**Not working yet:** push notifications. They need a push library and each operator's Firebase project, which the app doesn't have yet. Until then, the app follows the ride over the socket while it's open.
+## Screenshots
+
+Every screen comes in light and dark. These are the iOS Simulator and the Android emulator, captured against a seeded Fleetbase.
+
+**Booking**
+
+| Sign-in | Home | Destination | Car classes | Finding a driver |
+| :-: | :-: | :-: | :-: | :-: |
+| <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-login-create.webp" width="160" alt="Sign-in with a phone number" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-booking-create.webp" width="160" alt="The home screen: the map, saved places and a Where to? search" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-booking-create-destination.webp" width="160" alt="Choosing a drop-off from a search or saved places" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-quotes-list.webp" width="160" alt="Car classes with seats, pickup time and an estimated fare" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-searching.webp" width="160" alt="Finding a driver: the request offered to nearby drivers" /> |
+
+**The trip**
+
+| On the way | Arrived | In the trip | Final fare | Rating |
+| :-: | :-: | :-: | :-: | :-: |
+| <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-en-route.webp" width="160" alt="The driver on the way, arriving in 1 minute" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-arrived.webp" width="160" alt="The driver has arrived, with the number plate to check" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-in-progress.webp" width="160" alt="The trip in progress, with share trip and safety" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-fare-details.webp" width="160" alt="The final fare and its breakdown" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-rating-create.webp" width="160" alt="Rating the driver" /> |
+
+**After the trip**
+
+| Trips | Trip | Receipt | Saved places | Account |
+| :-: | :-: | :-: | :-: | :-: |
+| <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-trips-list.webp" width="160" alt="Past trips with their fares" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-trip-details.webp" width="160" alt="A past trip on the map, with its distance, time and final fare" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-receipt-details.webp" width="160" alt="A trip receipt" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-places-list.webp" width="160" alt="Saved places" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-account-details.webp" width="160" alt="The account screen" /> |
+
+**On Android**
+
+| Home | Car classes | Arrived | Final fare | Trips |
+| :-: | :-: | :-: | :-: | :-: |
+| <img src="https://fleetbase.io/images/screenshots/passenger-app/android/passenger-app-booking-create.webp" width="160" alt="The home screen on Android" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/android/passenger-app-quotes-list.webp" width="160" alt="Car classes on Android" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/android/passenger-app-ride-details-arrived.webp" width="160" alt="The driver has arrived, on Android" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/android/passenger-app-fare-details.webp" width="160" alt="The final fare on Android" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/android/passenger-app-trips-list.webp" width="160" alt="Past trips on Android" /> |
+
+**Light appearance**
+
+| Home | Car classes | On the way | Final fare | Help |
+| :-: | :-: | :-: | :-: | :-: |
+| <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-booking-create-light.webp" width="160" alt="The home screen in the light appearance" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-quotes-list-light.webp" width="160" alt="Car classes in the light appearance" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-en-route-light.webp" width="160" alt="The driver on the way in the light appearance" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-fare-details-light.webp" width="160" alt="The final fare in the light appearance" /> | <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-help-details-light.webp" width="160" alt="Help with the operator's contacts in the light appearance" /> |
 
 ## What the server needs
 

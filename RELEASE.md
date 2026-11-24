@@ -16,6 +16,7 @@
 
 - **Screenshot flows:** `.maestro/screenshots/` has Maestro flows for Fleetbase's screenshot pipeline. They cover sign-in, account, booking and a whole trip.
 - **Test IDs:** screens have `testID`s for those flows. Nothing visible changes.
+- **README screenshots:** the README shows the app on iOS and Android, in dark and light, from the screenshot pipeline, and links to the new [Passenger page](https://fleetbase.io/platform/passenger). It no longer says push notifications don't work, since they have since v0.1.4.
 - **Patch:** `patches/react-native-notifications+5.1.0.patch` holds the Firebase and `ReactHost` fixes. `patch-package` applies it on install.
 
 ## Upgrading
