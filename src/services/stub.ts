@@ -49,11 +49,20 @@ export function sampleMoney(dollars: number, currency?: string): string {
     if (!currency) {
         return `$${dollars.toFixed(2)}`;
     }
-    const amount = dollars * (CURRENCY_SCALE[currency] ?? 1);
+    const scale = CURRENCY_SCALE[currency] ?? 1;
+    const amount = dollars * scale;
+    // Currencies worth much less than a dollar are written without cents, rounded like real fares.
+    // Set here, not left to Intl: its digits differ between ICU versions.
+    const whole = scale >= 20;
     try {
-        const format = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' });
-        const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
-        const step = digits === 0 ? (amount >= 1000 ? 100 : 10) : 0.01;
+        const format = new Intl.NumberFormat('en', {
+            style: 'currency',
+            currency,
+            currencyDisplay: 'narrowSymbol',
+            minimumFractionDigits: whole ? 0 : 2,
+            maximumFractionDigits: whole ? 0 : 2,
+        });
+        const step = whole ? (amount >= 1000 ? 100 : 10) : 0.01;
         return format.format(Math.round(amount / step) * step);
     } catch {
         return `${currency} ${amount.toFixed(2)}`;
