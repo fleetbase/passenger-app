@@ -1,19 +1,23 @@
-> v0.1.5 ~ "Your own app icon"
+> v0.1.6 ~ "Android, fixed"
 
 ---
 ## Highlights
 
-- **`yarn generate:app-icon` makes every icon size from one image.** Put a square image of at least 1024×1024 at `brand/app-icon.png` and run it: it writes the iOS icon set and Android's square, round and adaptive icons, so a store build ships the operator's icon instead of Passenger's. Fleetbase's build machines run it whenever a build has `brand/app-icon.png`.
+- **The Android app works again.** v0.1.5 crashed on launch on Android. This release fixes that crash and three more Android problems found while capturing screenshots.
+
+## Fixes (Android)
+
+- **Crash on launch:** the notifications package is now built without the old `ReactNativeHost`, which React Native 0.86 no longer has.
+- **Buttons hidden by the keyboard:** on Android 15 and later the window no longer shrinks for the keyboard. The sign-in, account, saved places and chat screens now move their content up themselves.
+- **Startup crash without Firebase:** a build without a Firebase project no longer asks for a push token. With Firebase, the token reaches the app through React Native's new `ReactHost`.
+- **No pickup position:** the app asks for the rider's position at high accuracy, so phones without network location still get a pickup.
 
 ## Changes
 
-- New `scripts/generate-app-icon.js`. It uses ImageMagick (`magick`, or `convert` from ImageMagick 6) and adds no dependency.
-  - **iOS icons** are opaque 24-bit PNGs: transparency is filled with white.
-  - **Android's adaptive icon** uses the whole image as its foreground, on the image's top-left colour.
-- **Tests:** a test makes the icons from a non-square image with a transparent corner. It's skipped where ImageMagick isn't installed.
-- **README:** explains `brand/app-icon.png` and the command.
+- **Screenshot flows:** `.maestro/screenshots/` has Maestro flows for Fleetbase's screenshot pipeline. They cover sign-in, account, booking and a whole trip.
+- **Test IDs:** screens have `testID`s for those flows. Nothing visible changes.
+- **Patch:** `patches/react-native-notifications+5.1.0.patch` holds the Firebase and `ReactHost` fixes. `patch-package` applies it on install.
 
 ## Upgrading
 
-Nothing to change. Without `brand/app-icon.png`, nothing changes: builds keep Passenger's icon.
-
+Run `yarn install` so the new patch is applied, then rebuild Android. iOS needs nothing.
