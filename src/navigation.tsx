@@ -4,7 +4,7 @@ import React from 'react';
 import { branding } from './branding';
 import { AppRegistryProvider, customRoutes } from './extensions/app-registry';
 import { screenSlot } from './extensions/screens/screen-slot';
-import { sampleMode } from './services';
+import { showSampleBanner } from './services';
 import { SampleDataBanner } from './ui/SampleDataBanner';
 import { useApp } from './state/AppContext';
 
@@ -66,7 +66,7 @@ export function Navigation() {
                 )}
             </Stack.Navigator>
         </NavigationContainer>
-        {sampleMode ? <SampleDataBanner /> : null}
+        {showSampleBanner ? <SampleDataBanner /> : null}
         </AppRegistryProvider>
     );
 }
