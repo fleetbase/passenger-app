@@ -64,6 +64,8 @@ module.exports = (env, { mode = 'development' }) => ({
         new webpack.DefinePlugin({
             __DEV__: JSON.stringify(mode !== 'production'),
             'process.env.TAMAGUI_TARGET': JSON.stringify('web'),
+            // Origins allowed to host this build as a preview (src/preview/host.ts). Empty: not a preview build.
+            __PREVIEW_ORIGIN__: JSON.stringify(process.env.PASSENGER_PREVIEW_ORIGIN ?? ''),
         }),
         new HtmlWebpackPlugin({
             title: require('./app.json').displayName,

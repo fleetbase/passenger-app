@@ -1,69 +1,136 @@
+import type { SampleArea } from '../preview/host';
 import type { ChatMessage, Coordinate, Driver, FinalFare, Place, Profile, Quote, Ride, RideService, Trip } from './types';
 
-const PICKUP: Place = { id: 'pickup', name: '18 Harbour Street', detail: 'Current location', location: { latitude: 1.2847, longitude: 103.8511 } };
+/** Where the sample places are when nobody says: the centre of the area the app was first built around. */
+const DEFAULT_CENTER: Coordinate = { latitude: 1.2847, longitude: 103.8511 };
 
-const SAMPLE_PLACES: Place[] = [
-    { id: 'station', name: 'Central Station', detail: 'Station Square', location: { latitude: 1.3005, longitude: 103.8559 } },
-    { id: 'market', name: 'Riverside Market', detail: '2 Riverside Walk', location: { latitude: 1.2906, longitude: 103.8465 } },
-    { id: 'home', name: 'Home', detail: 'Linden Close', location: { latitude: 1.3048, longitude: 103.8318 }, saved: 'home' },
-    { id: 'work', name: 'Work', detail: 'Quay Road', location: { latitude: 1.2789, longitude: 103.8536 }, saved: 'work' },
+/** Each sample place, as an offset from the pickup, so the same journey works in any city. */
+const PLACE_OFFSETS: Array<Omit<Place, 'location'> & { offset: Coordinate }> = [
+    { id: 'station', name: 'Central Station', detail: 'Station Square', offset: { latitude: 0.0158, longitude: 0.0048 } },
+    { id: 'market', name: 'Riverside Market', detail: '2 Riverside Walk', offset: { latitude: 0.0059, longitude: -0.0046 } },
+    { id: 'home', name: 'Home', detail: 'Linden Close', offset: { latitude: 0.0201, longitude: -0.0193 }, saved: 'home' },
+    { id: 'work', name: 'Work', detail: 'Quay Road', offset: { latitude: -0.0058, longitude: 0.0025 }, saved: 'work' },
 ];
 
-const QUOTES: Quote[] = [
-    { id: 'economy', className: 'Economy', seats: 4, pickupMinutes: 3, fare: '$14.20' },
-    { id: 'xl', className: 'XL', seats: 6, pickupMinutes: 7, fare: '$19.50' },
-];
+/**
+ * Roughly how many of a currency one sample dollar is, so a fare reads like a real one there.
+ * Currencies not listed use the amounts as they are.
+ */
+const CURRENCY_SCALE: Record<string, number> = {
+    JPY: 150,
+    KRW: 1300,
+    IDR: 15000,
+    VND: 25000,
+    INR: 80,
+    PHP: 55,
+    THB: 35,
+    TWD: 30,
+    PKR: 280,
+    NGN: 1500,
+    KES: 130,
+    EGP: 48,
+    TRY: 34,
+    ZAR: 18,
+    MXN: 18,
+    BRL: 5,
+    CNY: 7,
+    HKD: 8,
+    MYR: 4.5,
+    AED: 3.7,
+    SAR: 3.75,
+    QAR: 3.6,
+    COP: 4000,
+    CLP: 900,
+    ARS: 900,
+};
+
+/** Formats a sample amount, given in dollars, in the area's currency. */
+export function sampleMoney(dollars: number, currency?: string): string {
+    if (!currency) {
+        return `$${dollars.toFixed(2)}`;
+    }
+    const scale = CURRENCY_SCALE[currency] ?? 1;
+    const amount = dollars * scale;
+    // Currencies worth much less than a dollar are written without cents, rounded like real fares.
+    // Set here, not left to Intl: its digits differ between ICU versions.
+    const whole = scale >= 20;
+    try {
+        const format = new Intl.NumberFormat('en', {
+            style: 'currency',
+            currency,
+            currencyDisplay: 'narrowSymbol',
+            minimumFractionDigits: whole ? 0 : 2,
+            maximumFractionDigits: whole ? 0 : 2,
+        });
+        const step = whole ? (amount >= 1000 ? 100 : 10) : 0.01;
+        return format.format(Math.round(amount / step) * step);
+    } catch {
+        return `${currency} ${amount.toFixed(2)}`;
+    }
+}
+
+/** The sample places, fares and trips, around a centre and in a currency. */
+export function sampleWorld({ center = DEFAULT_CENTER, currency }: SampleArea = {}) {
+    const money = (dollars: number) => sampleMoney(dollars, currency);
+    const pickup: Place = { id: 'pickup', name: '18 Harbour Street', detail: 'Current location', location: center };
+    const places: Place[] = PLACE_OFFSETS.map(({ offset, ...place }) => ({
+        ...place,
+        location: { latitude: center.latitude + offset.latitude, longitude: center.longitude + offset.longitude },
+    }));
+    const quotes: Quote[] = [
+        { id: 'economy', className: 'Economy', seats: 4, pickupMinutes: 3, fare: money(14.2) },
+        { id: 'xl', className: 'XL', seats: 6, pickupMinutes: 7, fare: money(19.5) },
+    ];
+    const fare: FinalFare = {
+        total: money(15.54),
+        estimate: money(14.2),
+        lines: [
+            { label: 'Base fare', amount: money(3) },
+            { label: 'Distance · 6.7 km', amount: money(8.04) },
+            { label: 'Time · 15 min', amount: money(4.5) },
+        ],
+    };
+    const sampleFare = (total: number, base: number, distance: number, time: number): FinalFare => ({
+        total: money(total),
+        estimate: money(total),
+        lines: [
+            { label: 'Base fare', amount: money(base) },
+            { label: 'Distance', amount: money(distance) },
+            { label: 'Time', amount: money(time) },
+        ],
+    });
+    const trips = (): Trip[] => {
+        const trip = (id: string, placeId: string, daysAgo: number, className: string, tripFare?: FinalFare, summary?: string): Trip => {
+            const dropoff = places.find((place) => place.id === placeId) as Place;
+            return {
+                id,
+                status: tripFare ? 'completed' : 'canceled',
+                date: new Date(Date.now() - daysAgo * DAY_MS).toISOString(),
+                className,
+                pickup,
+                dropoff,
+                route: routeBetween(pickup.location, dropoff.location),
+                payment: 'cash',
+                paid: !!tripFare,
+                driver: tripFare ? DRIVER : undefined,
+                fare: tripFare,
+                summary,
+            };
+        };
+        return [
+            trip('trip_3', 'market', 3, 'Economy', sampleFare(9.8, 3, 4.2, 2.6), '3.5 km · 9 min'),
+            trip('trip_2', 'home', 8, 'XL', sampleFare(21.1, 4, 11.6, 5.5), '8.3 km · 18 min'),
+            trip('trip_1', 'work', 13, 'Economy'),
+        ];
+    };
+    return { pickup, places, quotes, fare, trips };
+}
 
 const DRIVER: Driver = { name: 'Amara N.', initials: 'AN', rating: 4.9, vehicle: 'Silver Toyota Prius', plate: 'KTX 4821' };
-
-const FARE: FinalFare = {
-    total: '$15.54',
-    estimate: '$14.20',
-    lines: [
-        { label: 'Base fare', amount: '$3.00' },
-        { label: 'Distance · 6.7 km', amount: '$8.04' },
-        { label: 'Time · 15 min', amount: '$4.50' },
-    ],
-};
 
 const FARE_SUMMARY = '6.7 km · 15 min';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const sampleFare = (total: string, base: string, distance: string, time: string): FinalFare => ({
-    total,
-    estimate: total,
-    lines: [
-        { label: 'Base fare', amount: base },
-        { label: 'Distance', amount: distance },
-        { label: 'Time', amount: time },
-    ],
-});
-
-const sampleTrips = (): Trip[] => {
-    const trip = (id: string, placeId: string, daysAgo: number, className: string, fare?: FinalFare, summary?: string): Trip => {
-        const dropoff = SAMPLE_PLACES.find((place) => place.id === placeId) as Place;
-        return {
-            id,
-            status: fare ? 'completed' : 'canceled',
-            date: new Date(Date.now() - daysAgo * DAY_MS).toISOString(),
-            className,
-            pickup: PICKUP,
-            dropoff,
-            route: routeBetween(PICKUP.location, dropoff.location),
-            payment: 'cash',
-            paid: !!fare,
-            driver: fare ? DRIVER : undefined,
-            fare,
-            summary,
-        };
-    };
-    return [
-        trip('trip_3', 'market', 3, 'Economy', sampleFare('$9.80', '$3.00', '$4.20', '$2.60'), '3.5 km · 9 min'),
-        trip('trip_2', 'home', 8, 'XL', sampleFare('$21.10', '$4.00', '$11.60', '$5.50'), '8.3 km · 18 min'),
-        trip('trip_1', 'work', 13, 'Economy'),
-    ];
-};
 
 const DRIVER_REPLY = 'Thanks, see you soon.';
 const REPLY_MS = 1500;
@@ -126,10 +193,13 @@ const along = (points: Coordinate[], t: number): Coordinate => {
 type Active = { ride: Ride; timers: ReturnType<typeof setTimeout>[]; canceled: boolean };
 
 /** Sample data and a simulated driver, so the whole journey runs with no backend. */
-export function createStubService(): RideService {
+export function createStubService(area?: SampleArea): RideService {
+    const world = sampleWorld(area);
+    const PICKUP = world.pickup;
+    const FARE = world.fare;
     let active: Active | undefined;
-    let places = SAMPLE_PLACES;
-    let trips = sampleTrips();
+    let places = world.places;
+    let trips = world.trips();
     let nextId = 1;
     const chats = new Map<string, ChatMessage[]>();
     const watchers = new Map<string, Set<(messages: ChatMessage[]) => void>>();
@@ -171,9 +241,20 @@ export function createStubService(): RideService {
         };
 
         await wait(SEARCH_MS);
-        const start: Coordinate = { latitude: current.ride.pickup.location.latitude - 0.009, longitude: current.ride.pickup.location.longitude + 0.012 };
+        const start: Coordinate = {
+            latitude: current.ride.pickup.location.latitude - 0.009,
+            longitude: current.ride.pickup.location.longitude + 0.012,
+        };
         const approach = routeBetween(start, current.ride.pickup.location);
-        if (!update({ status: 'driver_en_route', driver: DRIVER, route: approach, carPosition: start, etaMinutes: (current.ride.quote.pickupMinutes ?? 3) + 1 })) {
+        if (
+            !update({
+                status: 'driver_en_route',
+                driver: DRIVER,
+                route: approach,
+                carPosition: start,
+                etaMinutes: (current.ride.quote.pickupMinutes ?? 3) + 1,
+            })
+        ) {
             return;
         }
         for (let tick = 1; tick <= APPROACH_TICKS; tick++) {
@@ -259,10 +340,18 @@ export function createStubService(): RideService {
             return places.filter((place) => !needle || place.name.toLowerCase().includes(needle));
         },
         async quotes() {
-            return QUOTES;
+            return world.quotes;
         },
         async requestRide({ pickup, dropoff, quote, payment }, onUpdate) {
-            const ride: Ride = { id: `ride_${Date.now()}`, status: 'searching', pickup, dropoff, quote, payment, route: routeBetween(pickup.location, dropoff.location) };
+            const ride: Ride = {
+                id: `ride_${Date.now()}`,
+                status: 'searching',
+                pickup,
+                dropoff,
+                quote,
+                payment,
+                route: routeBetween(pickup.location, dropoff.location),
+            };
             active = { ride, timers: [], canceled: false };
             run(active, onUpdate);
             return ride;

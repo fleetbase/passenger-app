@@ -167,6 +167,20 @@ GOOGLE_MAPS_API_KEY=your-key
 - A deployed site calls the API directly, so its address must be in the API's `FRONTEND_HOSTS`, or browsers block every request.
 - The web build uses Leaflet in place of the native map, with OpenStreetMap tiles by default. OpenStreetMap's tile servers aren't meant for heavy production use, so set `webMapTiles` in the brand file before going live.
 
+### Hosted previews
+
+A web build made with `PASSENGER_PREVIEW_ORIGIN` (comma-separated origins) runs as another site's preview, the way AppHelm shows an operator their app and takes its store screenshots. The host page sets `window.__PASSENGER_PREVIEW__` before the bundle loads:
+
+```js
+window.__PASSENGER_PREVIEW__ = {
+    branding: { schemaVersion: 1, name: 'Bayline Taxi', colors: { light: { accent: '#0F766E' } } }, // a brand file's contents
+    logo: '/brand/logo.png', // optional, and logoDark
+    sample: { center: { latitude: 51.5072, longitude: -0.1276 }, currency: 'GBP' }, // where the sample places are, and the fares' currency
+};
+```
+
+A hosted preview always runs on sample data and doesn't show the sample banner. Values it doesn't recognise are ignored. A build without `PASSENGER_PREVIEW_ORIGIN` never reads the global. See `src/preview/host.ts`.
+
 ## Configuration
 
 Settings are read from `.env` (or the environment) when the app is built, by `scripts/link-brand.js`. Restart Metro with `yarn start --reset-cache` after changing them.

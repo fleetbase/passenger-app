@@ -1,4 +1,4 @@
-import { createStubService } from '../src/services/stub';
+import { createStubService, sampleMoney } from '../src/services/stub';
 import type { Ride } from '../src/services/types';
 
 jest.useFakeTimers();
@@ -97,4 +97,22 @@ test('deleting an account clears saved places and trips', async () => {
     await service.deleteAccount();
     expect(await service.savedPlaces()).toEqual([]);
     expect(await service.trips()).toEqual([]);
+});
+
+test('sample places and fares follow the area a host gives', async () => {
+    const london = { latitude: 51.5072, longitude: -0.1276 };
+    const service = createStubService({ center: london, currency: 'GBP' });
+    const pickup = await service.currentPickup();
+    expect(pickup.location).toEqual(london);
+    const [station] = await service.searchPlaces('Central');
+    expect(Math.abs(station.location.latitude - london.latitude)).toBeLessThan(0.05);
+    const [quote] = await service.quotes(pickup, station);
+    expect(quote.fare).toBe('£14.20');
+});
+
+test('sample fares are rounded the way a currency is written', () => {
+    expect(sampleMoney(14.2)).toBe('$14.20');
+    expect(sampleMoney(14.2, 'JPY')).toBe('¥2,100');
+    expect(sampleMoney(14.2, 'IDR')).toMatch(/^Rp\s213,000$/);
+    expect(sampleMoney(14.2, 'EUR')).toBe('€14.20');
 });

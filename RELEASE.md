@@ -1,24 +1,16 @@
-> v0.1.6 ~ "Android, fixed"
+> v0.1.7 ~ "Hosted previews"
 
 ---
 ## Highlights
 
-- **The Android app works again.** v0.1.5 crashed on launch on Android. This release fixes that crash and three more Android problems found while capturing screenshots.
-
-## Fixes (Android)
-
-- **Crash on launch:** the notifications package is now built without the old `ReactNativeHost`, which React Native 0.86 no longer has.
-- **Buttons hidden by the keyboard:** on Android 15 and later the window no longer shrinks for the keyboard. The sign-in, account, saved places and chat screens now move their content up themselves.
-- **Startup crash without Firebase:** a build without a Firebase project no longer asks for a push token. With Firebase, the token reaches the app through React Native's new `ReactHost`.
-- **No pickup position:** the app asks for the rider's position at high accuracy, so phones without network location still get a pickup.
+- **Hosted previews.** A web build made with `PASSENGER_PREVIEW_ORIGIN` can run inside another site, such as AppHelm. The host page gives it the operator's brand and the area to show, through `window.__PASSENGER_PREVIEW__`. AppHelm uses this to show operators their app and to take their store screenshots.
 
 ## Changes
 
-- **Screenshot flows:** `.maestro/screenshots/` has Maestro flows for Fleetbase's screenshot pipeline. They cover sign-in, account, booking and a whole trip.
-- **Test IDs:** screens have `testID`s for those flows. Nothing visible changes.
-- **README screenshots:** the README shows the app on iOS and Android, in dark and light, from the screenshot pipeline, and links to the new [Passenger page](https://fleetbase.io/platform/passenger). It no longer says push notifications don't work, since they have since v0.1.4.
-- **Patch:** `patches/react-native-notifications+5.1.0.patch` holds the Firebase and `ReactHost` fixes. `patch-package` applies it on install.
+- **The host's brand:** a hosted preview's `branding`, `logo` and `logoDark` replace the build's brand file and logos.
+- **Sample data anywhere:** the sample places sit around `sample.center`, so the map shows the operator's city, and sample fares are shown in `sample.currency`, scaled roughly for currencies like JPY or IDR. Without them, sample data is as before.
+- **No banner in a hosted preview:** it always runs on sample data, and the host labels it.
 
 ## Upgrading
 
-Run `yarn install` so the new patch is applied, then rebuild Android. iOS needs nothing.
+Nothing to do. Native builds, and web builds without `PASSENGER_PREVIEW_ORIGIN`, behave as before.
