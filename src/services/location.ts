@@ -10,11 +10,13 @@ export async function currentPosition(): Promise<Coordinate> {
             throw new LocationUnavailableError();
         }
     }
+    // High accuracy: a pickup needs the rider's street, and without it Android asks only the
+    // network-location provider, which some phones and every emulator lack, so no position came.
     return new Promise((resolve, reject) => {
         Geolocation.getCurrentPosition(
             ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
             () => reject(new LocationUnavailableError()),
-            { timeout: 15000, maximumAge: 60000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
         );
     });
 }
