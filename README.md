@@ -19,7 +19,7 @@ An open-source passenger app for ride-hailing, built on [Fleetbase](https://gith
 It runs on iOS, Android and the web, from one React Native codebase.
 
 <p align="center">
-  <a href="https://fleetbase.io/platform/passenger">Passenger</a> · <a href="https://github.com/fleetbase/navigator-app">Navigator</a> · <a href="https://fleetbase.io/platform/fleetops">Fleet-Ops</a> · <a href="https://console.fleetbase.io">Console</a> · <a href="https://discord.gg/V7RVWRQ2Wm">Discord</a>
+  <a href="https://apphelm.fleetbase.io/passenger?utm_source=github&utm_medium=readme&utm_campaign=launch&utm_content=passenger-app"><b>Launch with AppHelm</b></a> · <a href="https://fleetbase.io/platform/passenger">Passenger</a> · <a href="https://github.com/fleetbase/navigator-app">Navigator</a> · <a href="https://fleetbase.io/platform/fleetops">Fleet-Ops</a> · <a href="https://console.fleetbase.io">Console</a> · <a href="https://discord.gg/V7RVWRQ2Wm">Discord</a>
 </p>
 
 <p align="center">
@@ -28,10 +28,36 @@ It runs on iOS, Android and the web, from one React Native codebase.
   <img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-fare-details.webp" width="240" alt="The final fare from the trip's actual distance and time, with its breakdown" />
 </p>
 
-> **Early development. Don't use it for real rides yet.** The whole ride runs on Fleet-Ops and goes end to end on the iOS Simulator, the Android emulator and the web against a local Fleetbase, but it hasn't carried real riders.
+## Launch your own app
+
+<table>
+  <tr>
+    <td width="34%" valign="top">
+      <a href="https://apphelm.fleetbase.io/passenger?utm_source=github&utm_medium=readme&utm_campaign=launch&utm_content=passenger-app"><img src="https://fleetbase.io/images/screenshots/passenger-app/ios/passenger-app-ride-details-en-route-light.webp" alt="The driver on the way in the light appearance: arriving in 3 minutes, with the driver's car and number plate" width="100%" /></a>
+    </td>
+    <td valign="top">
+
+**The easiest way to launch Passenger is [Fleetbase AppHelm](https://apphelm.fleetbase.io/passenger?utm_source=github&utm_medium=readme&utm_campaign=launch&utm_content=passenger-app).** It takes your Fleetbase organization and publishes Passenger as your own branded app in the App Store and Google Play, with no code to write and no builds to run.
+
+<p>
+  <a href="https://apphelm.fleetbase.io/passenger?utm_source=github&utm_medium=readme&utm_campaign=launch&utm_content=passenger-app"><img src="https://img.shields.io/badge/Launch%20with%20AppHelm-1C6CC7?style=for-the-badge" alt="Launch with AppHelm" /></a>
+</p>
+
+1. **Connect** your Fleetbase organization with its public key, on Fleetbase Cloud or your own server.
+2. **Add your brand** and try it in the live preview, with a sample trip in your city.
+3. **Follow the checklist** to the App Store and Google Play: AppHelm takes the store screenshots, sets up App Review sign-in, and handles the builds and submission from your own Apple and Google accounts.
+
+</td>
+  </tr>
+</table>
+
+**Prefer to build it yourself?** Clone this repository, set your keys and build with your own tools and accounts. Start with [Getting started](#getting-started), then [Branding and custom screens](#branding-and-custom-screens).
+
+> **Passenger is new.** Every trip runs on your Fleet-Ops. Try it with your own drivers on a test build (TestFlight and a Google Play internal test) before you open it to riders.
 
 ## Contents
 
+- [Launch your own app](#launch-your-own-app)
 - [What it does](#what-it-does)
 - [Screenshots](#screenshots)
 - [What the server needs](#what-the-server-needs)
@@ -294,7 +320,7 @@ This follows the same conventions as the other Fleetbase repositories.
 
 Merging runs `release.yml`, which checks that the branch name, `package.json` and `RELEASE.md` agree, then pushes the `v<version>` tag. The tag runs `create-release.yml`, which publishes the GitHub Release with `RELEASE.md` as its notes. If the tag step fails after a merge, run **Release Tag** by hand from the Actions tab with the version.
 
-Store builds aren't made here. Operators will publish their branded app through AppHelm, where Passenger support is being added.
+Store builds aren't made here. Operators publish their branded app through [AppHelm](https://apphelm.fleetbase.io/passenger?utm_source=github&utm_medium=readme&utm_campaign=launch&utm_content=passenger-app), or build it themselves.
 
 ## License
 
