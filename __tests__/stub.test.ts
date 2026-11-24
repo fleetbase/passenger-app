@@ -113,6 +113,6 @@ test('sample places and fares follow the area a host gives', async () => {
 test('sample fares are rounded the way a currency is written', () => {
     expect(sampleMoney(14.2)).toBe('$14.20');
     expect(sampleMoney(14.2, 'JPY')).toBe('¥2,100');
-    expect(sampleMoney(14.2, 'IDR')).toMatch(/^IDR\s213,000$/);
+    expect(sampleMoney(14.2, 'IDR')).toMatch(/^Rp\s213,000$/);
     expect(sampleMoney(14.2, 'EUR')).toBe('€14.20');
 });

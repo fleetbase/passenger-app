@@ -51,7 +51,7 @@ export function sampleMoney(dollars: number, currency?: string): string {
     }
     const amount = dollars * (CURRENCY_SCALE[currency] ?? 1);
     try {
-        const format = new Intl.NumberFormat('en', { style: 'currency', currency });
+        const format = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' });
         const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
         const step = digits === 0 ? (amount >= 1000 ? 100 : 10) : 0.01;
         return format.format(Math.round(amount / step) * step);
