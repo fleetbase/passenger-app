@@ -14,7 +14,11 @@ export function BrandLogo({ height = 32, fallback = true }: { height?: number; f
     const { scheme } = useApp();
     const source = scheme === 'dark' ? (logoDark ?? logo) : logo;
     if (!source) {
-        return fallback ? <T variant='strong' fontWeight='700'>{branding.name}</T> : null;
+        return fallback ? (
+            <T variant="strong" fontWeight="700">
+                {branding.name}
+            </T>
+        ) : null;
     }
-    return <Image accessibilityLabel={branding.name} source={source} resizeMode='contain' style={{ height, width: height * 4 }} />;
+    return <Image accessibilityLabel={branding.name} source={source} resizeMode="contain" style={{ height, width: height * 4 }} />;
 }

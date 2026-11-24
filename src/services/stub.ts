@@ -17,8 +17,31 @@ const PLACE_OFFSETS: Array<Omit<Place, 'location'> & { offset: Coordinate }> = [
  * Currencies not listed use the amounts as they are.
  */
 const CURRENCY_SCALE: Record<string, number> = {
-    JPY: 150, KRW: 1300, IDR: 15000, VND: 25000, INR: 80, PHP: 55, THB: 35, TWD: 30, PKR: 280, NGN: 1500, KES: 130,
-    EGP: 48, TRY: 34, ZAR: 18, MXN: 18, BRL: 5, CNY: 7, HKD: 8, MYR: 4.5, AED: 3.7, SAR: 3.75, QAR: 3.6, COP: 4000, CLP: 900, ARS: 900,
+    JPY: 150,
+    KRW: 1300,
+    IDR: 15000,
+    VND: 25000,
+    INR: 80,
+    PHP: 55,
+    THB: 35,
+    TWD: 30,
+    PKR: 280,
+    NGN: 1500,
+    KES: 130,
+    EGP: 48,
+    TRY: 34,
+    ZAR: 18,
+    MXN: 18,
+    BRL: 5,
+    CNY: 7,
+    HKD: 8,
+    MYR: 4.5,
+    AED: 3.7,
+    SAR: 3.75,
+    QAR: 3.6,
+    COP: 4000,
+    CLP: 900,
+    ARS: 900,
 };
 
 /** Formats a sample amount, given in dollars, in the area's currency. */
@@ -209,9 +232,20 @@ export function createStubService(area?: SampleArea): RideService {
         };
 
         await wait(SEARCH_MS);
-        const start: Coordinate = { latitude: current.ride.pickup.location.latitude - 0.009, longitude: current.ride.pickup.location.longitude + 0.012 };
+        const start: Coordinate = {
+            latitude: current.ride.pickup.location.latitude - 0.009,
+            longitude: current.ride.pickup.location.longitude + 0.012,
+        };
         const approach = routeBetween(start, current.ride.pickup.location);
-        if (!update({ status: 'driver_en_route', driver: DRIVER, route: approach, carPosition: start, etaMinutes: (current.ride.quote.pickupMinutes ?? 3) + 1 })) {
+        if (
+            !update({
+                status: 'driver_en_route',
+                driver: DRIVER,
+                route: approach,
+                carPosition: start,
+                etaMinutes: (current.ride.quote.pickupMinutes ?? 3) + 1,
+            })
+        ) {
             return;
         }
         for (let tick = 1; tick <= APPROACH_TICKS; tick++) {
@@ -300,7 +334,15 @@ export function createStubService(area?: SampleArea): RideService {
             return world.quotes;
         },
         async requestRide({ pickup, dropoff, quote, payment }, onUpdate) {
-            const ride: Ride = { id: `ride_${Date.now()}`, status: 'searching', pickup, dropoff, quote, payment, route: routeBetween(pickup.location, dropoff.location) };
+            const ride: Ride = {
+                id: `ride_${Date.now()}`,
+                status: 'searching',
+                pickup,
+                dropoff,
+                quote,
+                payment,
+                route: routeBetween(pickup.location, dropoff.location),
+            };
             active = { ride, timers: [], canceled: false };
             run(active, onUpdate);
             return ride;

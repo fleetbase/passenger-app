@@ -11,4 +11,6 @@ export const sampleMode = env.sampleData || isHostedPreview;
 export const showSampleBanner = sampleMode && !isHostedPreview;
 
 export const createService = (): RideService =>
-    sampleMode ? createStubService(hostedPreview?.sample) : createFleetbaseService({ host: env.host, key: env.key, orderConfig: env.orderConfig, pushApp: env.pushApp });
+    sampleMode
+        ? createStubService(hostedPreview?.sample)
+        : createFleetbaseService({ host: env.host, key: env.key, orderConfig: env.orderConfig, pushApp: env.pushApp });

@@ -12,7 +12,13 @@ test('a preview build reads the host page, or runs on defaults without one', () 
     expect(createHostedPreview({ origins, target: {} }).initial).toEqual({ sample: {} });
     const preview = createHostedPreview({
         origins,
-        target: { __PASSENGER_PREVIEW__: { branding: { name: 'Bayline Taxi' }, logo: '/p/abc/brand/logo', sample: { center: { latitude: 51.5, longitude: -0.12 }, currency: 'GBP' } } },
+        target: {
+            __PASSENGER_PREVIEW__: {
+                branding: { name: 'Bayline Taxi' },
+                logo: '/p/abc/brand/logo',
+                sample: { center: { latitude: 51.5, longitude: -0.12 }, currency: 'GBP' },
+            },
+        },
     });
     expect(preview.enabled).toBe(true);
     expect(preview.initial?.branding?.name).toBe('Bayline Taxi');
@@ -23,6 +29,10 @@ test('a preview build reads the host page, or runs on defaults without one', () 
 test('values the host page gets wrong are dropped', () => {
     expect(readHostedPreview('nope')).toBeNull();
     expect(
-        readHostedPreview({ branding: 'x', logo: 'javascript:alert(1)', sample: { center: { latitude: 200, longitude: 0 }, currency: 'pounds' } })
+        readHostedPreview({
+            branding: 'x',
+            logo: 'javascript:alert(1)',
+            sample: { center: { latitude: 200, longitude: 0 }, currency: 'pounds' },
+        })
     ).toEqual({ branding: undefined, logo: undefined, logoDark: undefined, sample: { center: undefined, currency: undefined } });
 });
